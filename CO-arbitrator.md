@@ -33,10 +33,10 @@ awk '/^>/{gsub(/__/, " "); print ""$1; next}{print}' $file > ${file%.*}.fasta
 
 # Ordenamos el identificador binomial (hace referencia a la especie) y el linaje taxonomico en la posicion rank K,P,C,O,F,G,S
 
-# 1
+# 1 BINOMIAL IDS
 awk '/^>/{gsub(/__/, " "); print $1"\t"$2;}' ${file} | sed 's/;/ /g' | sed 's/^>//g' > ${file%.*}.binomial.ids
 
-# 2
+# 2 TAXA FILE
 awk '/^>/{gsub(/__/, " "); print $1"\t"$3}' $file | sed 's/^>//g' | sed 's/.$/;/g' > ${file%.*}.tax
 # extra.
 # Count the number of max levels (between 2-19) - full lineage / abbreviate lineage
@@ -75,10 +75,10 @@ awk '/^>/{gsub(/__/, " "); print ""$1; next}{print}' $file > ${file%.*}.fasta
 
 # Ordenamos el identificador binomial (hace referencia a la especie) y el linaje taxonomico en la posicion rank K,P,C,O,F,G,S
 
-# 1
+# 1 BINOMIAL IDs
 awk '/^>/{gsub(/__/, " "); print $1"\t"$2;}' ${file} | sed 's/;/ /g' | sed 's/^>//g' > ${file%.*}.binomial.ids
 
-# 2
+# 2 TAXA FILE
 awk '/^>/{gsub(/__/, " "); print $1"\t"$3}' $file | sed 's/^>//g' | sed 's/.$/;/g' > ${file%.*}.tax
 
 
@@ -290,5 +290,101 @@ awk '{print $1}' Coarbitrator_COI_nuc_curated.tax | sort | uniq -c | sort -n -k2
 grep  -A1 'NC_008833' Coarbitrator_COI_nuc_curated.fasta
 >complement(NC_008833
 NN
+```
+
+## lineage content
+
+```R
+phyla <- data.frame(table(tax$V2))
+phyla <- phyla[order(phyla$Freq, decreasing = TRUE), ]
+ncol(phyla) # 34
+
+
+```
+
+Also verify assignation
+
+```R
+
+
+
+path_run014 <- '/Users/cigom/metagenomics/COI/co-arbitration-assig/run014_t2_ASVs_99_rdp_outdir'
+setwd(path_run014)
+
+fasta.file <- "run014_t2_ASVs.fasta"
+tax.file <- "run014_t2_ASVs.Coarbitrator_COI_nuc_curated.wang.taxonomy"
+
+
+fasta.obj <- readDNAStringSet(fasta.file)
+seqs <- as.data.frame(fasta.obj)$x
+
+#   reading FASTA file Coarbitrator_COI_nuc.fasta: ignored 56 invalid one-letter sequence codes
+
+taxa.obj <- read.csv(tax.file, header=FALSE, sep='\t', na.strings=c("","NA"), stringsAsFactors = FALSE)
+
+
+cat("\n 1. Processing taxonomy... \n")
+
+tax <- strsplit(taxa.obj[,2], ";")
+max.rank <- max(lengths(tax))
+
+tax <- sapply(tax, "[", c(1:max(lengths(tax)))) # GenBank levels
+tax <- as.data.frame(t(tax))
+
+tax1 <- as.data.frame(apply(tax, 2, function(x) gsub("\\(.*$", "",  x, perl=TRUE)), stringsAsFactors = F)
+
+rownames(tax1) <- taxa.obj[,1]
+                           
+cat("\n 2. Bootstrap stats ... \n")
+
+boots <- as.data.frame(apply(tax, 2, function(x) gsub("[A-z||()]", "",  x, perl=TRUE)), stringsAsFactors = F)
+boots <- apply(boots, 2, as.numeric)
+boots <- data.frame(boots)
+boots[is.na(boots)] <- 0
+  
+rownames(boots) <- taxa.obj[,1]
+                             
+
+rank.names <- vector(max.rank, mode="character")
+
+for (i in 1:max.rank) {
+  rank.names[i] <- paste("Rank", i, sep="_")
+}
+                             
+colnames(boots) <- rank.names
+colnames(tax1) <- rank.names
+
+                             
+dim(tax1)
+# [1] 21278    20                         
+                  
+ntaxa <-  function(r) {
+  			r <- data.frame(table(r))  
+ 			  r <- r[order(r$Freq, decreasing = TRUE), ]
+  		return(r) }
+r1 <- ntaxa(tax1[,1])  
+
+r2 <- ntaxa(tax1[,2]) # 13 - Eukaryota_unclassified
+# Eukaryota_unclassified 12, 428 
+                             
+nrow(tax_clear <- tax1[tax1[,2] != 'Eukaryota_unclassified', ])
+# [1] 8850  (41.6 %)
+
+r3 <- ntaxa(tax_clear[,3]) # 31
+r4 <- ntaxa(tax_clear[,4]) # 106
+r5 <- ntaxa(tax_clear[,5]) #216
+r19 <- ntaxa(tax_clear[,19])    
+
+# /Users/cigom/metagenomics/COI/species_resolution_per_db
+```
+
+Comparar con asignaciones previas en bold y midori
+
+
+
+```bash
+/LUSTRE/bioinformatica_data/genomica_funcional/MG_COI/dada2_asv/run14_20190228_COI/dada2_asv/run014_20190305_COI_t2/run014_t2_ASVs_99_rdp_bold_outdir
+
+
 ```
 

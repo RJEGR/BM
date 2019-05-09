@@ -285,8 +285,10 @@ $BLAST/blastn -query $query \
 
 
 
-#### find novel miRNAs
+#### find novel miRNAs 
 
 Known non-miRNA reads were identified by comparison with NCBI’s ‘‘nt’’ nucleotide database using Standalone MEGABLAST (version 2.2.17). Reads matching a known RNA molecule with percent identity 495% were removed from the data set, and the remaining sequence reads were then investigated for phylogenetic conservation. Reads from all species were combined, and those that ‘‘matched’’ a read with a higher frequency count were grouped. Matches were determined using the three criteria used to identify known miRNAs given above (similar length, seed sequence identity, and nonseed sequence similarity). 
+
+> find conserved miRNAs from different metazoan
 
 Reads conserved across multiple taxa were grouped, and groups were ranked by the frequency count of the most frequently occurring sequence. Reads not conserved across multiple taxa were divided by taxon and ranked by frequency count. This completed the automated analysis by miRMiner, resulting in a list of conserved reads across all taxa and lists of unique reads for each taxon
