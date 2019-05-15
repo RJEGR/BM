@@ -73,6 +73,10 @@ Rscript --vanilla bold_public_process_for_RDP.R taxonomy.${kingdom}.csv FALSE
 
 El siguiente script identifica el primer campo (columna, como el identificador de la especie [processid]); así como la última posición (ie. última columna) a la secuencia de origen [voucher_type];Si existen identificadores repetidos, el script re-etiquetara con el sufijo equivalente a las n repeticiones del identificador separado por un guión bajo “_”. El resto de las columnas son implementadas para formatear la taxonomía para el algoritmo de mothur (classify.seqs). El nombre del archivo (Ej. taxonomy.Animals.csv) es utilizado para etiquetar el segundo nivel taxonómico (Ej. root;rank1, donde rank1 pertenece al nivel taxonómico reino) por lo que es necesario nombrar el archivo de entrada con la etiqueta correspondiente. Los campos de la asignación taxonómica vacíos son rellenados con valores NA, y finalmente se retienen sólo los taxones con resolución hasta especie. 
 
+
+
+El script puede ser descargado de [bold_public_process_for_RDP.R](https://raw.githubusercontent.com/RJEGR/metagenomics/master/bold_public_process_for_RDP.R)
+
 > Script:
 
 ```r
@@ -174,6 +178,9 @@ Concatenamos
 ```BASH
 cat ./*/Bold.*.fasta > BOLD_public.ALL.fasta
 cat ./*/Bold.*.tax > BOLD_public.ALL.tax
+# or
+cat ./*/Bold.*.tax > BOLD_public_species.tax
+cat ./*/Bold.*.fasta > BOLD_public_species.fasta
 ```
 
 

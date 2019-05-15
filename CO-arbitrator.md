@@ -4,24 +4,21 @@
 
 Procesar el formato de base de datos que los autores de CO-arbitrator desarrollaron:
 
-_Fasta file containing COI nucleotides records retrieved from GenBank by CO-ARBitrator. Deflines are delimited by double underscores, and consist of an accession number, followed by a binomial identification, followed by taxonomy. Values within the binomial and the taxonomy are delimited by semicolons._
-
-
+Fasta file containing COI nucleotides records retrieved from GenBank by CO-ARBitrator. Deflines are delimited by double underscores, and consist of an accession number, followed by a binomial identification, followed by taxonomy. Values within the binomial and the taxonomy are delimited by semicolons.
 
 _The binomial identification and the taxonomy are internally delimited by semicolons._
-
-
 
 > La nomenclatura es la del GenBank
 
 ```bash
 >NC_004385__Melanotaenia;lacustris__Eukaryota;Metazoa;Chordata;Craniata;Vertebrata;Euteleostomi;Actinopterygii;Neopterygii;Teleostei;Neoteleostei;Acanthomorphata;Ovalentaria;Atherinomorphae;Atheriniformes;Melanotaeniidae;Melanotaenia.
 GTGATAATTACACGTTGATTCTTCTCTACTAATCACAAAGACATT ...
+#
+KJ940174__Undinula;vulgaris__Eukaryota;Arthropoda;Maxillopoda;Calanoida;Calanidae;Undinula;Undinulavulgaris #<-- el nivel especie esta unido
+ATAATTGGAACAGGTTTAAGAATAATTATTCGATTAGAATTAGGACAAGCTGGATCATTAATTGGAGATGATCAGATTTATAATGTAGT...
 ```
 
-
-
-El archivo `Coarbitrator_COI_nuc.fa` contiene 1,043,596:
+El archivo `Coarbitrator_COI_nuc.fa` contiene 1,043,596 secuencias:
 
 Procesamos:
 
@@ -40,7 +37,7 @@ awk '/^>/{gsub(/__/, " "); print $1"\t"$2;}' ${file} | sed 's/;/ /g' | sed 's/^>
 awk '/^>/{gsub(/__/, " "); print $1"\t"$3}' $file | sed 's/^>//g' | sed 's/.$/;/g' > ${file%.*}.tax
 # extra.
 # Count the number of max levels (between 2-19) - full lineage / abbreviate lineage
-awk -F';' '{print (NF ? NF+1 : 0)}' Coarbitrator_COI_nuc.tax | sort | uniq -c | sort -n -k2,2
+awk -F';' '{print (NF ? NF+0 : 0)}' Coarbitrator_COI_nuc.tax | sort | uniq -c | sort -n -k2,2
 # al articulo reporta que 461 secuencias tuvieron asignacion nivel-genero y 199,119 identificaciones de mayor nivel
  112 3
  284 4
@@ -63,8 +60,6 @@ awk -F';' '{print (NF ? NF+1 : 0)}' Coarbitrator_COI_nuc.tax | sort | uniq -c | 
 ```
 
 El archivo `Coarbitrator_COI_aa.faa` contiene 1,043,739,  (en el articulo determinan 1,054,973 secuencias proteicas [>= 95 aa] del metazoan-genBank clasificadas satisfactoriamente )
-
-
 
 procesamos:
 
@@ -118,8 +113,6 @@ scp -r /Users/cigom/metagenomics/db/co-arbitrator rgomez@omica:/LUSTRE/bioinform
 
 
 
-
-
 ### rdp classifier
 
 ```bash
@@ -165,7 +158,7 @@ exit
 Entonces
 
 ```bash
-sbatch rdp_assign_coarbitrator.sh run014_t2_ASVs.fasta 99
+sbatch rdp_assign.sh run014_t2_ASVs.fasta 99 Coarbitrator_COI_nuc_curated.tax
 ```
 
 Algunos **errores** en la base de datos debido a: 
@@ -203,7 +196,7 @@ Trabajaremos con R para limpiar los errores de los puntos a y b:
 #!/usr/bin/env Rscript
 # reviewed version from ~/Documents/GitHub/metagenomics/bold_public_process_for_RDP.R
 
-.bioc_packages <- c("Biostrings", "IRanges", "tidyr")
+.bioc_packages <- c("Biostrings", "IRanges", "tidyr", "zoo")
 
 # 2.
 .inst <- .bioc_packages %in% installed.packages()
@@ -222,7 +215,7 @@ setwd(path_db)
 
 fasta.file <- "Coarbitrator_COI_nuc.fasta"
 tax.file <- "Coarbitrator_COI_nuc.tax"
-
+binomail.file <- "Coarbitrator_COI_nuc.binomial.ids"
 
 fasta.obj <- readDNAStringSet(fasta.file)
 seqs <- as.data.frame(fasta.obj)$x
@@ -230,14 +223,34 @@ seqs <- as.data.frame(fasta.obj)$x
 #   reading FASTA file Coarbitrator_COI_nuc.fasta: ignored 56 invalid one-letter sequence codes
 
 taxa.obj <- read.csv(tax.file, header=FALSE, sep='\t', na.strings=c("","NA"), stringsAsFactors = FALSE)
+# 
+bim.obj <- read.csv(binomail.file, header=FALSE, sep='\t', stringsAsFactors = FALSE)
 
-tax <- strsplit(taxa.obj[,2], ";")
+# anadimos el identificador binomial como ultimo nivel a lo largo de la asignacion 
+if(identical(bim.obj[,1], taxa.obj[,1])) {
+  bim.tax <- data.frame(tax = taxa.obj[,2], binom = bim.obj[,2], stringsAsFactors = FALSE)
+  bim.tax <- unite(bim.tax, sep = ";", remove = TRUE, col = Taxonomy ) }
+                                              
+
+tax <- strsplit(bim.tax$Taxonomy, ";")
 tax <- sapply(tax, "[", c(1:max(lengths(tax)))) # GenBank levels
+tax <- as.data.frame(t(tax), stringsAsFactors = FALSE)
 
-tax[is.na(tax)] <- "Unclassified" # fill na possition with tag unknown
-tax <- as.data.frame(t(tax))
+# fill NA possition with pervious row assignation;
 
-dim(tax[complete.cases(tax),]) # 28
+tax <- data.frame(t(apply(tax, 1, na.locf)))
+
+# also use last_possition_unclassify to fill NA rows <---
+
+
+#tax <- strsplit(taxa.obj[,2], ";")
+#tax <- sapply(tax, "[", c(1:max(lengths(tax)))) # GenBank levels
+#tax[is.na(tax)] <- "Unclassified" # fill na possition with tag unknown
+#tax <- as.data.frame(t(tax))
+
+dim(tax[complete.cases(tax),]) # 28 with NAs 
+
+
 
 
 Id <- make.unique(as.vector(taxa.obj[,1]), sep = "_")
@@ -278,8 +291,6 @@ quit(save ='no')
 
  Y verificamos que no tengamos mas duplicados
 
-
-
 ```bash
 awk '{print $1}' Coarbitrator_COI_nuc_curated.tax | sort | uniq -c | sort -n -k2,2 | tail
    # 1 Z93007
@@ -291,6 +302,21 @@ grep  -A1 'NC_008833' Coarbitrator_COI_nuc_curated.fasta
 >complement(NC_008833
 NN
 ```
+
+error, 
+
+```bash
+tail mothur.1557519203.logfile
+Z93010 has an error in the taxonomy.  This may be due to a ;;
+Z93011 has an error in the taxonomy.  This may be due to a ;;
+Z93012 has an error in the taxonomy.  This may be due to a ;;
+Z93013 has an error in the taxonomy.  This may be due to a ;;
+complement(NC_008833 has an error in the taxonomy.  This may be due to a
+```
+
+
+
+**use last_possition_unclassify to fill NA rows**
 
 ## lineage content
 
