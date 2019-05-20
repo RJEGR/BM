@@ -126,17 +126,21 @@ bedtools getfasta -fi ../full_assembly/trinity_genes.fasta -bed three_prime_UTR.
 
 ## miRanda
 
+Se generan archivos arriba de 100GB
+
 ```bash
 # 
 miranda mature_collapsed2dna.fa trinity_genes.3p_UTR.fasta -sc 160 -en -25 -out mature_collapsed2dna_vs_trinity_genes.3p_UTR.out
 
-# and using the ORFs - pfma based
-
+# and using the ORFs - pfma base
 miranda mature_collapsed2dna.fa test.trinity_genes.fasta.transdecoder.pfam.headers.cds -sc 160 -en -25 -out mature_collapsed2dna_vs_TEST_trinity_genes.fasta.transdecoder.pfam.headers.out
 
 # then make table
 # names: Seq1,Seq2,Tot Score,Tot Energy,Max Score,MaxEnergy,Strand,Len1,Len2,Positions
-grep "^>>" mature_collapsed2dna_vs_trinity_genes.3p_UTR.out > mature_collapsed2dna_vs_trinity_genes.3p_UTR.R.txt
+grep "^>>" mature_collapsed2dna_vs_trinity_genes.3p_UTR.out > mature_collapsed2dna_vs_trinity_genes.3p_UTR.R.txt &
+
+# and
+grep ">>" mature_collapsed2dna_vs_trinity_genes.fasta.transdecoder.pfam.headers.out > mature_collapsed2dna_vs_trinity_genes.fasta.transdecoder.pfam.headers.R.txt &
 
 # results in cluster
 
