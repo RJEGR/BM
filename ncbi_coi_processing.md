@@ -51,7 +51,7 @@ Get the lineage of the sequences:
 grep '^>' CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta  | awk '{print $1}' | sed 's/>//' > ids
 
 # 2 search id lineage
-for i in $(cat ids); do esearch -db nucleotide -query $i | efetch -format xml | xtract -pattern Org-ref -element Object-id_id,Org-ref_taxname,OrgMod_subname,OrgName_lineage,Textseq-id_accession,OrgName_div,BinomialOrgName_genus,BinomialOrgName_species; done
+for i in $(cat ids); do esearch -db nucleotide -query $i | efetch -format xml | xtract -pattern Org-ref -element Object-id_id,Org-ref_taxname,OrgMod_subname,OrgName_lineage,Textseq-id_accession,OrgName_div,BinomialOrgName_genus,BinomialOrgName_species; done > CO1_COI_COX1_COXI_GENE_Eukaryota_nr.xtract.Org-ref-element
 ```
 
 2) 
