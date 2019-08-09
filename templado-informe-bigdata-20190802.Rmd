@@ -225,7 +225,8 @@ plot <- obj %>%
   #filter_taxa(taxon_names %in% c("Actinopterygii"), supertaxa = TRUE) %>%
   heat_tree(node_label = taxon_names,
           node_size = n_obs,
-          node_color = obj$data$tax_occ$Huevo, 
+          node_color = obj$data$tax_occ$Larva,
+         node_size_interval = c(1,100),
           node_color_axis_label = "Presencia de taxones",
           layout = "fr",
           initial_layout = "re")
