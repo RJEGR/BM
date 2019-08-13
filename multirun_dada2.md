@@ -259,6 +259,8 @@ save.image(file = paste0(out_path,"/multiresults.RData"))
 
 cat("\n**********\n**********\nI'm done here\nContinue w/ assignation step**********\n**********\n\n\n")
 
+sessionInfo()
+
 quit(save="no")
 ```
 
