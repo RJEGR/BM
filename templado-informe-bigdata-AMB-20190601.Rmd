@@ -307,17 +307,15 @@ plot <- ggplot(dat[Abundance > 0 & Especie != 'Undetermined_R'],
  #scale_y_log10() + 
  ylim(0, max_ab) +
  theme_classic() + 
+ theme(axis.text.y = element_text(size = 6)) +
  facet_grid(Corrida ~ ., space = "free", scales = "free") +
  labs(y = "Abundancia Relativa (%)", x ="Especies", title = paste0("Especies abundantes del crucero ", set),
       caption = paste0("taxones que representan mas del ", size, "% de la abundancia por muestra"))
-
 
 png(paste0(path,"/", "Figura-10-boxplot.Sp.png"), units="px", width=2700, height=3700, res=400)
 plot(plot, col=adjustcolor("black", alpha=0.2))
 dev.off()
 ```
-
-
 
 ```{r Figura 10S. Bubbleplot., fig.align = "center", fig.cap = "Generos más abundantes a lo largo de todas las estaciones. Se muestran aquellos taxones presentes en almenos ??? de la abundancia total por muestra (Se colorean por orden cada una de las especies).", fig.width = 8, fig.height = 7}
 
