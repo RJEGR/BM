@@ -4,7 +4,7 @@ author: "Ricardo Gomez-Reyes"
 date: "9/3/2019"
 output: word_document
 ---
- 
+
 ```{r setup, include=FALSE}
 
 # Setting global option in all the chunks-code
@@ -14,7 +14,6 @@ knitr::opts_chunk$set(warning=FALSE, echo = FALSE,
 
 rm(list=ls())
 ```
-
 
 ```{r paths and functions, echo = FALSE}
 dir <- "/Users/cigom/transcriptomics/oyster_full_assembly/"
@@ -28,6 +27,9 @@ annot.name <- 'annotation/Trinotate.xls'
 
 cv_prot_name <- 'annotation/GCF_002022765.2_C_virginica-3.0_protein.faa.annot'
 cv_nc_name <- 'annotation/GCF_002022765.2_C_virginica-3.0_rna.fna.annot'
+
+cg_prot_name <- 'annotation/Crassostrea_gigas.oyster_v9.pep.all.fa.annot'
+cg_nc_name <- 'annotation/Crassostrea_gigas.oyster_v9.cds.all.fa.annot'
 
 setwd(dir)
 
@@ -58,8 +60,9 @@ split_blast <- function (x, hit = "sprot_Top_BLASTX_hit")
 
 ```
 
-Procesamos los datos
-```{r loadding data-set, echo = FALSE}
+## Cargamos los datos:
+
+```{r read count-table, echo = FALSE}
 
 # file <- list.files(path = ctb.name, full.names = TRUE)
 file <- paste0(dir, ctb.name)
@@ -68,7 +71,7 @@ dim(y <- read.csv(file, header=T, com='', row.names=1, check.names=F, sep='\t', 
 
 ```
 
-```{r define groups- metadata, echo = FALSE}
+```{r read groups- metadata, echo = FALSE}
 metadata.file <- paste0(dir, metadta)
 
 metadata <- read.csv(metadata.file, header=T, 
@@ -77,10 +80,275 @@ metadata <- read.csv(metadata.file, header=T,
 
 
 identical(names(y), metadata$factor2)
-rep <- metadata$factor1
-factor <- metadata$Grupo
+rep <- metadata$Replica
+```
+
+## Filtrado de matriz de conteos
+```{r 1. mean replicates, echo = FALSE}
+dim(data <- y) # restore before doing various data transformations
+# group by replicate-mean
+#names(data) <- rep
+names(data) <- metadata$Replica
+
+#select(metadata, Identificador, factor1)
+
+# using rowMeans
+dim(data <- sapply(unique(rep), function(g) rowMeans(data[,rep==g,drop=FALSE])))
 
 ```
+
+```{r 2. remove inactive - genes}
+dim(data)
+#dim(data_sbt <- data[rowMeans(data) >= 5,])
+#dim(data_sbt <- rpm[rownames(rpm) %in% rownames(data[rowMeans(data) >= 5,]),])
+dim(data_sbt <- data[rownames(data) %in% rownames(data[rowMeans(data) >= 5,]),])
+
+# log2(FPKM) values less than −15 were set to not-detected
+
+```
+
+## Parse annotation
+
+```{r Load annotation}
+library(trinotateR)
+annot.file <- paste0(dir, annot.name)
+x <- read_trinotate(annot.file)
+summary_trinotate(x)
+```
+
+```{r Detect Ribosomal}
+na.exclude(top_table(x, "RNAMMER", n = 10))
+
+rnamer_id <- x[!is.na(x$RNAMMER),]$transcript_id
+rname_abundance <- data_sbt[rownames(data_sbt) %in% rnamer_id,]
+
+knitr::kable(t(rname_abundance *100))
+# Remove ribosomal from annotation:
+dim(x1 <- x[is.na(x$RNAMMER),])
+# and from quantification
+dim(data_sbt)
+dim(data_sbt_1 <- data_sbt[!rownames(data_sbt) %in% rnamer_id,])
+
+```
+
+```{r GETBACK the genome feature}
+cv_nc_file <- paste0(dir, cv_nc_name)
+cv_prot_file <- paste0(dir, cv_prot_name)
+
+cv_nc_annot <- read.csv(cv_nc_file, header = FALSE, sep = ' ')
+cv_nc_annot <- data.frame(id = cv_nc_annot$V1, annot = apply(cv_nc_annot[-1], 1, paste, collapse=" "))
+
+cv_prot_annot <- read.csv(cv_prot_file, header = FALSE, sep = ' ')
+cv_prot_annot <- data.frame(id = cv_prot_annot$V1, annot = apply(cv_prot_annot[-1], 1, paste, collapse=" "))
+
+# and for c gigas
+
+cg_prot_annot <- read.csv(paste0(dir, cg_prot_name), header = FALSE, sep = ' ')
+cg_nuc_annot <- read.csv(paste0(dir, cg_nc_name), header = FALSE, sep = ' ')
+
+cg_prot_annot <- data.frame(id = cg_prot_annot$V1, annot = apply(cg_prot_annot[-c(1,2)], 1, paste, collapse=" "))
+
+cg_nuc_annot <- data.frame(id = cg_nuc_annot$V1, annot = apply(cg_nuc_annot[-c(1,2)], 1, paste, collapse=" "))
+
+```
+
+```{r parse data}
+pfam <- as.data.frame(split_pfam(x1))
+
+go <- split_GO(x1)
+
+blastx <- split_blast(x1, "sprot_Top_BLASTX_hit")
+
+blastp_genome0 <- split_blast(x1, "GCFvirginica_blastp_BLASTP")
+blastn_genome0 <- split_blast(x1, "GCFvirginica_blastn_BLASTX")
+
+blastp_cgigas <- split_blast(x1, "CGigas_pep_BLASTP")
+blastn_cgigas <- split_blast(x1, "CGigas_nuc_BLASTX")
+
+names(blastp_genome0)[4] <- 'genome_id'
+names(blastn_genome0)[4] <- 'genome_id'
+
+cv_prot <-  cv_prot_annot[cv_prot_annot$id %in% blastp_genome0$genome_id,]
+cv_prot <- cv_prot[match(blastp_genome0$genome_id, cv_prot$id),]
+
+blastp_genome <- cbind(select(blastp_genome0, -name, -lineage, -domain, -genus), select(cv_prot, -id))
+                       
+cv_nc <-  cv_nc_annot[cv_nc_annot$id %in% blastn_genome0$genome_id,]
+cv_nc <- cv_nc[match(blastn_genome0$genome_id, cv_nc$id),]
+blastn_genome <- cbind(select(blastn_genome0, -name, -lineage, -domain, -genus), select(cv_nc, -id))
+    
+
+
+xy <- data.frame(Identity=blastp_genome$identity, Type="Transcript")
+y <- data.frame(Identity=blastn_genome$identity, Type="ORF")
+
+datavis <- rbind(xy,y)
+
+save_plot <- ggplot(datavis, aes(Identity, fill = Type)) + 
+        geom_histogram(bins = 100, alpha = 0.7, aes(y = ..density..), position = 'identity') + 
+        theme_classic() +
+        scale_fill_brewer(direction = -1, palette = "Paired") + 
+        stat_function(fun=dnorm,
+                     color="red",
+                     args=list(mean=mean(datavis$Identity, na.rm = TRUE), 
+                              sd=sd(datavis$Identity, na.rm = TRUE))) +  
+        scale_x_continuous("Identity of the aligment vs genome")
+
+png(paste0(dir,"/", "identity_trancript_vs_genome.png"), units="px", width=3700, height=2500, res=400)
+plot(save_plot, col=adjustcolor("black", alpha=0.2))
+dev.off()
+```
+
+```{r 3. remove ribosomal from count and rename average samples}
+data_sbt_1 <- as.data.frame(data_sbt[!rownames(data_sbt) %in% rnamer_id,])
+
+rep_samples <- names(which(table(rep) > 1))
+
+rename_p <- paste0(rep_samples, "_P")
+  
+rep_pos <- which(names(as.data.frame(data)) %in% rep_samples)
+
+names(data_sbt_1)[rep_pos] <- rename_p
+```
+
+```{r define annotation}
+annot_matrix <- matrix(ncol = 5, nrow = length(rownames(data_sbt_1)))
+annot_matrix[,1] <- rownames(data_sbt_1) %in% pfam$transcript
+annot_matrix[,2] <- rownames(data_sbt_1) %in% go$transcript
+annot_matrix[,3] <- rownames(data_sbt_1) %in% blastx$transcript
+annot_matrix[,4] <- rownames(data_sbt_1) %in% blastn_genome$transcript
+annot_matrix[,5] <- rownames(data_sbt_1) %in%  blastp_genome$transcript
+
+
+annot_tbl <- data.frame(annot_matrix)
+names(annot_tbl) <- c('pfam','go','uniprot', 'cv_nuc', 'cv_prot')
+rownames(annot_tbl) <- rownames(data_sbt_1)
+
+# complate cases of annotation:
+annot_tbl$complete <- rowSums(annot_tbl)
+dim(complete_annot <- annot_tbl[annot_tbl$complete == 5,])
+```
+
+```{r parse annot & quantification}
+# for trinotate databases:
+dim(data_sbt_pfam <- data_sbt_1[rownames(data_sbt_1) %in% pfam$transcript, ])
+dim(data_sbt_go <- data_sbt_1[rownames(data_sbt_1) %in% go$transcript, ])
+dim(data_sbt_blastx <- data_sbt_1[rownames(data_sbt_1) %in% blastx$transcript, ])
+
+# for  genome
+dim(data_sbt_cv_nuc <- data_sbt_1[rownames(data_sbt_1) %in% blastn_genome$transcript, ])
+dim(data_sbt_cv_prot <- data_sbt_1[rownames(data_sbt_1) %in% blastp_genome$transcript, ])
+
+# for cg genome
+dim(data_sbt_cg_prot <- data_sbt_1[rownames(data_sbt_1) %in% blastp_cgigas$transcript, ])
+dim(data_sbt_cg_nuc <- data_sbt_1[rownames(data_sbt_1) %in% blastn_cgigas$transcript, ])
+# complete 5 cases 
+dim(data_sbt_complete_cases <- data_sbt_1[rownames(data_sbt_1) %in% rownames(complete_annot), ])
+```
+
+```{r non-annotated but abundace}
+non_annotated <- rownames(annot_tbl[annot_tbl$complete == 0,])
+dim(data_sbt_non_annotated <- data_sbt_1[rownames(data_sbt_1) %in% non_annotated, ])
+
+# check top-abundant of non-annotated data
+# data_sbt_non_annotated %>% 
+#   data.frame() %>%
+#   top_n(25) -> non_annotated_included  
+```
+
+```{r keep the last annotation per dbs}
+# keep the last annotation per dbs
+# test
+head(pfam$transcript[which(table(pfam$transcript) >= 3)])
+
+tt <- pfam[pfam$transcript == 'TRINITY_DN18353_c0_g1_i1', c('transcript','pfam', 'symbol','name', 'align', 'evalue')]
+tt[!duplicated(tt$transcript, fromLast = TRUE) ,]
+# test finish
+
+# keep the last transcript with highes evalue
+# Save Quantitative Annotation
+save_QA <- function(x,y) {
+  z <- data_sbt_non_annotated
+  db_unique <- y[!duplicated(y$transcript, fromLast = TRUE) ,]
+  results <- cbind(x, db_unique[db_unique$transcript %in% rownames(x),])
+  
+ add <- matrix(ncol = ncol(z) + ncol(y), nrow = nrow(z))
+ add[,1:ncol(z)] <- as.matrix(z)
+ add <- as.data.frame(add)
+ names(add) <- c(names(as.data.frame(z)), names(y))
+  
+ results <- rbind(results, add)
+  
+ return(results)
+}
+
+# z <- data_sbt_non_annotated
+# y <- pfam
+# add <- matrix(ncol = ncol(z) + ncol(y), nrow = nrow(z))
+# add[,1:ncol(z)] <- as.matrix(z)
+# add <- as.data.frame(add)
+# names(add) <- c(names(as.data.frame(z)), names(y))
+ 
+dim(save_pfam <- save_QA(data_sbt_pfam, pfam))
+dim(save_blastx <- save_QA(data_sbt_blastx, blastx))
+dim(save_go <- save_QA(data_sbt_go, go))
+
+dim(save_cv_nuc <- save_QA(data_sbt_cv_nuc, blastn_genome))
+dim(save_cv_prot <- save_QA(data_sbt_cv_prot, blastp_genome))
+
+dim(save_cg_nuc <- save_QA(data_sbt_cg_nuc, blastn_cgigas))
+dim(save_cg_prot <- save_QA(data_sbt_cg_prot, blastp_cgigas))
+
+# And save complete cases:
+
+#dim(save_complete_cases <- save_QA(data_sbt_complete_cases, rownames(complete_annot)))
+#dim(data_sbt_complete_cases <- data_sbt_1[rownames(data_sbt_1) %in% rownames(complete_annot), ])
+```
+
+```{r save results}
+write.table(save_pfam, file = paste0(dir, name, '.pfam.txt'), sep="\t", 
+            row.names = F, col.names = T)
+#
+write.table(save_blastx, file = paste0(dir, name, '.swissProt.txt'), sep="\t", 
+            row.names = F, col.names = T)
+#
+write.table(save_go, file = paste0(dir, name, '.GO.txt'), sep="\t", 
+            row.names = F, col.names = T)
+
+# 
+write.table(save_cv_prot, file = paste0(dir, name, '.CV_prot.txt'), sep="\t", 
+            row.names = F, col.names = T)
+
+write.table(save_cv_nuc, file = paste0(dir, name, '.CV_nuc.txt'), sep="\t", 
+            row.names = F, col.names = T)
+
+write.table(save_cg_nuc, file = paste0(dir, name, '.CG_nuc.txt'), sep="\t", 
+            row.names = F, col.names = T)
+
+write.table(save_cg_prot, file = paste0(dir, name, '.CG_prot.txt'), sep="\t", 
+            row.names = F, col.names = T)
+
+```
+
+## quit()
+
+```{r}
+# incluir ademas, version de genoma x/p de ostion en el trinotate.xls
+
+# protein
+#/LUSTRE/apps/bioinformatica/Trinotate/util/trinotateSeqLoader/Trinotate_BLAST_loader.pl --sqlite Trinotate.sqlite --outfmt6 GENOME_REFERENCE/good.Trinity.fasta.transdecoder_vs_GCF_002022765.2_C_virginica-3.0_protein_blastp.outfmt6 --prog blastp --dbtype GCFvirginica_blastp
+# nuc
+#/LUSTRE/apps/bioinformatica/Trinotate/util/trinotateSeqLoader/Trinotate_BLAST_loader.pl --sqlite Trinotate.sqlite --outfmt6 nuc_GENOME_REFERENCE/good.Trinity_vs_GCF_002022765.2_C_virginica-3.0_rna_blastn.outfmt6 --prog blastx --dbtype GCFvirginica_blastn
+# Nuc c.gigas
+#/LUSTRE/apps/bioinformatica/Trinotate/util/trinotateSeqLoader/Trinotate_BLAST_loader.pl --sqlite Trinotate.sqlite --outfmt6 nuc_GENOME_CGigas/good.Trinity_vs_Crassostrea_gigas.oyster_v9.cds.all_blastn.outfmt6 --prog blastx --dbtype CGigas_nuc
+# pep c.gigas
+#/LUSTRE/apps/bioinformatica/Trinotate/util/trinotateSeqLoader/Trinotate_BLAST_loader.pl --sqlite Trinotate.sqlite --outfmt6 pep_GENOME_CGigas/good.Trinity.fasta.transdecoder_vs_Crassostrea_gigas.oyster_v9.pep.all_blastp.outfmt6 --prog blastp --dbtype CGigas_pep
+
+# re-escribimos el trinotate.xls
+# Trinotate Trinotate.sqlite report > Trinotate.xls
+```
+
+### Visualization
 
 ```{r PcoA plot, echo = FALSE}
 pca <- prcomp(t(y), center = TRUE, scale. = FALSE)
@@ -92,15 +360,23 @@ pca.var.per <- round(pca.var/sum(pca.var)*100, 1)
 pca.data <- data.frame(Sample=rownames(pca$x),
                        X=pca$x[,1],
                        Y=pca$x[,2])
+
 pca.data <- cbind(pca.data, metadata)
 
+
+n <-length(unique(pca.data$Sexo))
+getPalette = colorRampPalette(brewer.pal(n, "Dark2"))
+
+
 library(ggplot2)
-pcaplot <- ggplot(data=pca.data, aes(x=X, y=Y, label=Sample, color = Sexo)) +
-  geom_text(label.size = 0.1) +
+pcaplot <- ggplot(data=pca.data, aes(x=X, y=Y, label=Grupo, color = Sexo)) +
+  geom_text(label.size = 0.01) +
   geom_point() +
   #geom_point(aes(color = factor), size = 5, alpha = 0.7) +
   xlab(paste("PC1 - ", pca.var.per[1], "%", sep="")) +
-  ylab(paste("PC2 - ", pca.var.per[2], "%", sep="")) + theme_bw()
+  ylab(paste("PC2 - ", pca.var.per[2], "%", sep="")) + theme_bw() +
+  scale_color_manual(values=getPalette(n)) + facet_wrap(~Tejido)
+  
 ```
 
 ```{r mean visualization, echo = FALSE}
@@ -123,22 +399,14 @@ p1 <- ggplot(datam, aes(x=variable, y=rawCount)) +
 
 ```
 
-```{r mean replicates, echo = FALSE}
-dim(data <- y) # restore before doing various data transformations
-# group by replicate-mean
-names(data) <- rep
-# using rowMeans
-dim(data <- sapply(unique(rep), function(g) rowMeans(data[,rep==g,drop=FALSE])))
-```
-
 ```{r scale to reads per million (rpm)}
 # barplot(colSums(data))
 rpm <- apply(data, 2, function(x) {x / sum(x)})
-
+# sanity check
 barplot(colSums(rpm))
 ```    
 
-```{r log2 transformation, echo = FALSE}
+```{r -log2 transformation, echo = FALSE}
 #data <- y[-1] # restore before doing various data transformations
 dataExp <- log2(data+1)
 dataExp <- as.matrix(dataExp) # convert to matrix
@@ -162,7 +430,7 @@ gridExtra::grid.arrange(p1,p2)
 dev.off()
 ```
 
-```{r datavis-time demand}
+```{r -datavis-time demand}
 .cran_packages <- c('dplyr', 'superheat', 'ggplot2', 'RColorBrewer')
 .inst <- .cran_packages %in% installed.packages()
 
@@ -219,14 +487,6 @@ superheat(dataExp,
           legend.width = 1,
           legend.text.size = 7
 )
-
-```
-
-```{r remove inactive - genes}
-dim(data)
-#dim(data_sbt <- data[rowMeans(data) >= 5,])
-dim(data_sbt <- rpm[rownames(rpm) %in% rownames(data[rowMeans(data) >= 5,]),])
-# log2(FPKM) values less than −15 were set to not-detected
 ```
 
 ```{r Gaussian fit and zFPKM normalization}
@@ -250,220 +510,19 @@ boxplot(apply(data_sbt, 2, function(x){var(x)}))
 
 ```
 
-## Parse annotation
-
-```{r Load annotation}
-library(trinotateR)
-annot.file <- paste0(dir, annot.name)
-x <- read_trinotate(annot.file)
-summary_trinotate(x)
-```
-
-```{r remove Ribosomal}
-na.exclude(top_table(x, "RNAMMER", n = 10))
-
-rnamer_id <- x[!is.na(x$RNAMMER),]$transcript_id
-rname_abundance <- data_sbt[rownames(data_sbt) %in% rnamer_id,]
-
-knitr::kable(t(rname_abundance))
-# Remove ribosomal from annotation:
-dim(x1 <- x[is.na(x$RNAMMER),])
-# and from quantification
-dim(data_sbt)
-dim(data_sbt_1 <- data_sbt[!rownames(data_sbt) %in% rnamer_id,])
-
-```
-
-```{r parse data}
-pfam <- as.data.frame(split_pfam(x1))
-
-go <- split_GO(x1)
-
-blastx <- split_blast(x1, "sprot_Top_BLASTX_hit")
-
-blastp_genome0 <- split_blast(x1, "GCFvirginica_blastp_BLASTP")
-blastn_genome0 <- split_blast(x1, "GCFvirginica_blastn_BLASTX")
-
-names(blastp_genome0)[4] <- 'genome_id'
-names(blastn_genome0)[4] <- 'genome_id'
-
-cv_prot <-  cv_prot_annot[cv_prot_annot$id %in% blastp_genome0$genome_id,]
-cv_prot <- cv_prot[match(blastp_genome0$genome_id, cv_prot$id),]
-blastp_genome <- cbind(select(blastp_genome0, -name, -lineage, -domain, -genus), select(cv_prot, -id))
-                       
-cv_nc <-  cv_nc_annot[cv_nc_annot$id %in% blastn_genome0$genome_id,]
-cv_nc <- cv_nc[match(blastn_genome0$genome_id, cv_nc$id),]
-blastn_genome <- cbind(select(blastn_genome0, -name, -lineage, -domain, -genus), select(cv_nc, -id))
-    
-
-
-xy <- data.frame(Identity=blastp_genome$identity, Type="Transcript")
-y <- data.frame(Identity=blastn_genome$identity, Type="ORF")
-
-datavis <- rbind(xy,y)
-
-save_plot <- ggplot(datavis, aes(Identity, fill = Type)) + 
-        geom_histogram(bins = 100, alpha = 0.7, aes(y = ..density..), position = 'identity') + 
-        theme_classic() +
-        scale_fill_brewer(direction = -1, palette = "Paired") + 
-        stat_function(fun=dnorm,
-                     color="red",
-                     args=list(mean=mean(datavis$Identity, na.rm = TRUE), 
-                              sd=sd(datavis$Identity, na.rm = TRUE))) +  
-        scale_x_continuous("Identity of the aligment vs genome")
-
-png(paste0(dir,"/", "identity_trancript_vs_genome.png"), units="px", width=3700, height=2500, res=400)
-plot(save_plot, col=adjustcolor("black", alpha=0.2))
-dev.off()
-```
 
 ```{r check n of annotations}
-data_sbt_1 <- data_sbt[!rownames(data_sbt) %in% rnamer_id,]
-annot_matrix <- matrix(ncol = 5, nrow = length(rownames(data_sbt_1)))
-annot_matrix[,1] <- rownames(data_sbt_1) %in% pfam$transcript
-annot_matrix[,2] <- rownames(data_sbt_1) %in% go$transcript
-annot_matrix[,3] <- rownames(data_sbt_1) %in% blastx$transcript
-annot_matrix[,4] <- rownames(data_sbt_1) %in% blastn_genome$transcript
-annot_matrix[,5] <- rownames(data_sbt_1) %in%  blastp_genome$transcript
-
-
-annot_tbl <- data.frame(annot_matrix)
-names(annot_tbl) <- c('pfam','go','uniprot', 'cv_nuc', 'cv_prot')
-rownames(annot_tbl) <- rownames(data_sbt_1)
-
-# complate cases of annotation:
-annot_tbl$complete <- rowSums(annot_tbl)
-dim(complete_annot <- annot_tbl[annot_tbl$complete == 5,])
-```
-
-```{r getback the genome feature}
-cv_nc_file <- paste0(dir, cv_nc_name)
-cv_prot_file <- paste0(dir, cv_prot_name)
-
-cv_nc_annot <- read.csv(cv_nc_file, header = FALSE, sep = ' ')
-cv_nc_annot <- data.frame(id = cv_nc_annot$V1, annot = apply(cv_nc_annot[-1], 1, paste, collapse=" "))
-
-cv_prot_annot <- read.csv(cv_prot_file, header = FALSE, sep = ' ')
-cv_prot_annot <- data.frame(id = cv_prot_annot$V1, annot = apply(cv_prot_annot[-1], 1, paste, collapse=" "))
-
-```
-
-```{r parse annot & quantification}
-
-dim(data_sbt_pfam <- data_sbt_1[rownames(data_sbt_1) %in% pfam$transcript, ])
-dim(data_sbt_go <- data_sbt_1[rownames(data_sbt_1) %in% go$transcript, ])
-dim(data_sbt_blastx <- data_sbt_1[rownames(data_sbt_1) %in% blastx$transcript, ])
-
-dim(data_sbt_cv_nuc <- data_sbt_1[rownames(data_sbt_1) %in% blastn_genome$transcript, ])
-dim(data_sbt_cv_prot <- data_sbt_1[rownames(data_sbt_1) %in% blastp_genome$transcript, ])
-
-dim(data_sbt_complete_cases <- data_sbt_1[rownames(data_sbt_1) %in% rownames(complete_annot), ])
-# la pregunta, es con que anotacion vamos a dejar los ids?
-
-```
-
-```{r non-annotated but abundace}
-non_annotated <- rownames(annot_tbl[annot_tbl$complete == 0,])
-dim(data_sbt_non_annotated <- data_sbt_1[rownames(data_sbt_1) %in% non_annotated, ])
-# check top-abundant of non-annotated data
-data_sbt_non_annotated %>% 
-  data.frame() %>%
-  top_n(25) -> non_annotated_included  
-```
-
-```{r datavis rpm of annotated transcripts }
-datavis <- data.frame(all = colSums(data_sbt_complete_cases),
-                      pfam = colSums(data_sbt_pfam),
-                      GO = colSums(data_sbt_go),
-                      blastn = colSums(data_sbt_blastx),
-                      genome_nuc = colSums(data_sbt_cv_nuc),
-                      genome_aa = colSums(data_sbt_cv_prot),
-                      none = colSums(data_sbt_non_annotated),
-                      Ribosomal = colSums(rname_abundance))
-
-levels <- names(sort(colSums(datavis), decreasing = TRUE))
-datavis$samples <- rownames(datavis)
-#datavis$libsize <- 1
-
-datavism <- melt(datavis, variable.name = 'dbs', value.name = 'rpm')
-datavism$dbs <- factor(datavism$dbs, levels = levels)
-
-annot_barplot <- ggplot(data=datavism, aes(x=samples, y=rpm, fill = dbs)) + 
-  geom_col(position=position_dodge(), alpha = 0.7) +
-  scale_y_continuous(expand = c(0,0), limits = c(0,1)) +
-  scale_fill_brewer(palette ="Paired" ) +
-  labs(y="% rpkm ", x = 'samples') +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, size = 7), axis.text.y = element_text(size = 5)) +
-  coord_flip() +  facet_wrap(~dbs)
-
-png(paste0(dir,"/", "annotation_and_rpm.png"), units="px", width=3000, height=3100, res=400)
-plot(annot_barplot, col=adjustcolor("black", alpha=0.2))
-dev.off()
-
-```
-
-```{r keep the last annotation per dbs}
-# keep the last annotation per dbs
-# test
-head(pfam$transcript[which(table(pfam$transcript) >= 3)])
-
-tt <- pfam[pfam$transcript == 'TRINITY_DN18353_c0_g1_i1', c('transcript','pfam', 'symbol','name', 'align', 'evalue')]
-tt[!duplicated(tt$transcript, fromLast = TRUE) ,]
-# test finish
-
-# keep the last transcript with highes evalue
-# Save Quantitative Annotation
-save_QA <- function(x,y) {
-  db_unique <- y[!duplicated(y$transcript, fromLast = TRUE) ,]
-  results <- cbind(x, db_unique[db_unique$transcript %in% rownames(x),])
-  #results <- select(results
-  return(results)
+# binary heatmap?
+boolean.integer <- function(arg1) {
+  arg1 [arg1 == "TRUE"] <- 1
+  arg1 [arg1 == "FALSE"] <- 0
+  arg1 <- as.integer(arg1)
 }
 
+annot_tbl_boo <- apply(annot_tbl, 2, boolean.integer)
+superheat(annot_tbl_boo)
 
 
-dim(save_pfam <- save_QA(data_sbt_pfam, pfam))
-dim(save_blastx <- save_QA(data_sbt_blastx, blastx))
-dim(save_go <- save_QA(data_sbt_go, go))
-dim(save_cv_nuc <- save_QA(data_sbt_cv_nuc, blastn_genome))
 
-#cv_prot_annot[cv_prot_annot$id %in% save_cv_prot$genome_id,]
-
-dim(save_cv_prot <- save_QA(data_sbt_cv_prot, blastp_genome))
-
-# And save complete cases:
-
-#dim(save_complete_cases <- save_QA(data_sbt_complete_cases, rownames(complete_annot)))
-#dim(data_sbt_complete_cases <- data_sbt_1[rownames(data_sbt_1) %in% rownames(complete_annot), ])
 ```
 
-```{r save results}
-write.table(save_pfam, file = paste0(dir, name, '.pfam.txt'), sep="\t", 
-            row.names = F, col.names = T)
-#
-write.table(save_blastx, file = paste0(dir, name, '.swissProt.txt'), sep="\t", 
-            row.names = F, col.names = T)
-#
-write.table(save_go, file = paste0(dir, name, '.GO.txt'), sep="\t", 
-            row.names = F, col.names = T)
-
-# 
-write.table(save_cv_prot, file = paste0(dir, name, '.CV_prot.txt'), sep="\t", 
-            row.names = F, col.names = T)
-
-write.table(save_cv_nuc, file = paste0(dir, name, '.CV_nuc.txt'), sep="\t", 
-            row.names = F, col.names = T)
-```
-
-```{r}
-# incluir ademas, version de genoma x/p de ostion en el trinotate.xls
-
-# protein
-#/LUSTRE/apps/bioinformatica/Trinotate/util/trinotateSeqLoader/Trinotate_BLAST_loader.pl --sqlite Trinotate.sqlite --outfmt6 GENOME_REFERENCE/good.Trinity.fasta.transdecoder_vs_GCF_002022765.2_C_virginica-3.0_protein_blastp.outfmt6 --prog blastp --dbtype GCFvirginica_blastp
-# nuc
-#/LUSTRE/apps/bioinformatica/Trinotate/util/trinotateSeqLoader/Trinotate_BLAST_loader.pl --sqlite Trinotate.sqlite --outfmt6 nuc_GENOME_REFERENCE/good.Trinity_vs_GCF_002022765.2_C_virginica-3.0_rna_blastn.outfmt6 --prog blastx --dbtype GCFvirginica_blastn
-
-# re-escribimos el trinotate.xls
-# Trinotate Trinotate.sqlite report > Trinotate.xls
-```
