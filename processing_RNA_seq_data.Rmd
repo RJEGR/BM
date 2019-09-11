@@ -58,6 +58,22 @@ split_blast <- function (x, hit = "sprot_Top_BLASTX_hit")
     data.table(x1)
 }
 
+# gene ontology pfam
+split_GOp <- function (x, hit = "gene_ontology_pfam") 
+{
+    y <- x[!is.na(get(hit)), .(get(hit), gene_id, transcript_id, 
+        prot_id)]
+    z <- strsplit(y$V1, "`")
+    n <- sapply(z, length)
+    z <- strsplit(unlist(z), "\\^")
+    x1 <- data.frame(gene = rep(y$gene_id, n), transcript = rep(y$transcript_id, 
+        n), protein = rep(gsub(".*\\|", "", y$prot_id), n), go = sapply(z, 
+        "[", 1), ontology = sapply(z, "[", 2), name = sapply(z, 
+        "[", 3), stringsAsFactors = FALSE)
+    message(nrow(x1), " ", hit, " annotations")
+    data.table(x1)
+}
+
 ```
 
 ## Cargamos los datos:
@@ -67,7 +83,7 @@ split_blast <- function (x, hit = "sprot_Top_BLASTX_hit")
 # file <- list.files(path = ctb.name, full.names = TRUE)
 file <- paste0(dir, ctb.name)
 
-dim(y <- read.csv(file, header=T, com='', row.names=1, check.names=F, sep='\t', stringsAsFactors = FALSE))
+dim(count_tbl <- read.csv(file, header=T, com='', row.names=1, check.names=F, sep='\t', stringsAsFactors = FALSE))
 
 ```
 
@@ -79,13 +95,13 @@ metadata <- read.csv(metadata.file, header=T,
                      sep='\t', stringsAsFactors = FALSE)
 
 
-identical(names(y), metadata$factor2)
+identical(names(count_tbl), metadata$factor2)
 rep <- metadata$Replica
 ```
 
 ## Filtrado de matriz de conteos
 ```{r 1. mean replicates, echo = FALSE}
-dim(data <- y) # restore before doing various data transformations
+dim(data <- count_tbl) # restore before doing various data transformations
 # group by replicate-mean
 #names(data) <- rep
 names(data) <- metadata$Replica
@@ -156,8 +172,10 @@ cg_nuc_annot <- data.frame(id = cg_nuc_annot$V1, annot = apply(cg_nuc_annot[-c(1
 pfam <- as.data.frame(split_pfam(x1))
 
 go <- split_GO(x1)
+go_prot <- split_GO(x1, 'gene_ontology_pfam')
 
 blastx <- split_blast(x1, "sprot_Top_BLASTX_hit")
+blastp <- split_blast(x1, "sprot_Top_BLASTP_hit")
 
 blastp_genome0 <- split_blast(x1, "GCFvirginica_blastp_BLASTP")
 blastn_genome0 <- split_blast(x1, "GCFvirginica_blastn_BLASTX")
@@ -212,21 +230,142 @@ names(data_sbt_1)[rep_pos] <- rename_p
 ```
 
 ```{r define annotation}
-annot_matrix <- matrix(ncol = 5, nrow = length(rownames(data_sbt_1)))
-annot_matrix[,1] <- rownames(data_sbt_1) %in% pfam$transcript
-annot_matrix[,2] <- rownames(data_sbt_1) %in% go$transcript
-annot_matrix[,3] <- rownames(data_sbt_1) %in% blastx$transcript
-annot_matrix[,4] <- rownames(data_sbt_1) %in% blastn_genome$transcript
-annot_matrix[,5] <- rownames(data_sbt_1) %in%  blastp_genome$transcript
+annot_matrix <- matrix(ncol = 3, nrow = length(rownames(data_sbt_1)))
+annot_matrix[,1] <- rownames(data_sbt_1) %in%  unique(blastn_genome$transcript)
+annot_matrix[,2] <- rownames(data_sbt_1) %in% unique(go$transcript)
+annot_matrix[,3] <- rownames(data_sbt_1) %in%  unique(blastx$transcript)
+
+annot_tbl <- data.frame(annot_matrix)
+summary(annot_tbl)
+# complate cases of annotation:
+boolean.integer <- function(arg1) {
+  arg1 [arg1 == "TRUE"] <- 1
+  arg1 [arg1 == "FALSE"] <- 0
+  arg1 <- as.integer(arg1)
+}
+
+annot_tbl_boo <- data.frame(apply(annot_tbl, 2, boolean.integer))
+rownames(annot_tbl_boo) <- rownames(data_sbt_1)
+names(annot_tbl_boo) <- c('cv_nuc','go', 'swissprot')
+
+annot_tbl_boo$complete <- rowSums(annot_tbl_boo)
+dim(complete_annot <- annot_tbl_boo[annot_tbl_boo$complete == 3,])
+
+non_annotated <- rownames(annot_tbl_boo[annot_tbl_boo$complete == 0,])
+dim(data_sbt_non_annotated <- data_sbt_1[rownames(data_sbt_1) %in% non_annotated, ])
+# and filterd based on the mean fpkm >= 5
+dim(data_sbt_non_annotated <- data_sbt_non_annotated[rownames(data_sbt_non_annotated) %in% rownames(data_sbt_non_annotated[rowMeans(data_sbt_non_annotated) >= 5,]),])
+
+# And save complete cases:
+dim(data_sbt_complete_cases_nuc <- data_sbt_1[rownames(data_sbt_1) %in% rownames(complete_annot), ])
+
+# transcript-level
+dim(z <- data_sbt_non_annotated)
+
+dim(complete_cases_cv_nuc <- save_QA(data_sbt_complete_cases_nuc, blastn_genome, z))
+dim(complete_cases_go_nuc <- save_QA(data_sbt_complete_cases_nuc, go,z))
+dim(complete_cases_swissprot_nuc <- save_QA(data_sbt_complete_cases_nuc, blastx,z))
+
+reorder_ <- function(x,y) {
+  x <- x[match(rownames(y), x$transcript),]
+  return(x)
+  
+  identical(rownames(y), x$transcript)
+}
+
+complete_cases_cv_nuc <- reorder_(complete_cases_cv_nuc, data_sbt_complete_cases_nuc)
+complete_cases_go_nuc <- reorder_(complete_cases_go_nuc, data_sbt_complete_cases_nuc)
+complete_cases_swissprot_nuc <- reorder_(complete_cases_swissprot_nuc, data_sbt_complete_cases_nuc)
+
+# # sanity-check the ids per database
+identical(rownames(data_sbt_complete_cases_nuc), complete_cases_cv_nuc$transcript)
+identical(rownames(data_sbt_complete_cases_nuc), complete_cases_go_nuc$transcript)
+identical(rownames(data_sbt_complete_cases_nuc), complete_cases_swissprot_nuc$transcript)
+
+samples <- names(data_sbt_complete_cases_nuc)
+
+
+dim(save_complete_nuc <- cbind(complete_cases_cv_nuc, 
+                               select(complete_cases_go_nuc, 
+                                      -samples, -gene, -transcript, -protein),
+                               select(complete_cases_swissprot_nuc, 
+                                      -samples, -gene, -transcript, -protein)))
+
+write.table(save_complete_nuc, file = paste0(dir, name, '_cv_go_swissprot_nuc.txt'), sep="\t", 
+            row.names = F, col.names = T)
+
+```
+
+```{r}
+# =========
+# orf level
+# =========
+
+annot_matrix <- matrix(ncol = 4, nrow = length(rownames(data_sbt_1)))
+annot_matrix[,1] <- rownames(data_sbt_1) %in%  blastp_genome$transcript
+annot_matrix[,2] <- rownames(data_sbt_1) %in% pfam$transcript
+annot_matrix[,3] <- rownames(data_sbt_1) %in% go_prot$transcript
+annot_matrix[,4] <- rownames(data_sbt_1) %in% blastp$transcript
+
 
 
 annot_tbl <- data.frame(annot_matrix)
-names(annot_tbl) <- c('pfam','go','uniprot', 'cv_nuc', 'cv_prot')
-rownames(annot_tbl) <- rownames(data_sbt_1)
+summary(annot_tbl)
+annot_tbl_boo <- data.frame(apply(annot_tbl, 2, boolean.integer))
 
+rownames(annot_tbl_boo) <- rownames(data_sbt_1)
+names(annot_tbl_boo) <- c('cv_prot','pfam','go_pfam', 'swissprot')
 # complate cases of annotation:
-annot_tbl$complete <- rowSums(annot_tbl)
-dim(complete_annot <- annot_tbl[annot_tbl$complete == 5,])
+
+annot_tbl_boo$complete <- rowSums(annot_tbl_boo)
+
+dim(complete_annot <- annot_tbl_boo[annot_tbl_boo$complete == 4,])
+
+# get-back results
+dim(data_sbt_complete_cases <- data_sbt_1[rownames(data_sbt_1) %in% rownames(complete_annot), ])
+
+non_annotated <- rownames(annot_tbl_boo[annot_tbl_boo$complete == 0,])
+dim(data_sbt_non_annotated <- data_sbt_1[rownames(data_sbt_1) %in% non_annotated, ])
+# and filterd based on the mean fpkm >= 5
+dim(data_sbt_non_annotated <- data_sbt_non_annotated[rownames(data_sbt_non_annotated) %in% rownames(data_sbt_non_annotated[rowMeans(data_sbt_non_annotated) >= 5,]),])
+
+# And save complete cases:
+dim(data_sbt_complete_cases_nuc <- data_sbt_1[rownames(data_sbt_1) %in% rownames(complete_annot), ])
+
+# transcript-level
+dim(z <- data_sbt_non_annotated)
+
+dim(complete_cases_cv_pep <- save_QA(data_sbt_complete_cases, blastp_genome, z))
+dim(complete_cases_pfam_pep <- save_QA(data_sbt_complete_cases, pfam, z))
+dim(complete_cases_go_pep <- save_QA(data_sbt_complete_cases, go_prot,z))
+dim(complete_cases_swissprot_pep <- save_QA(data_sbt_complete_cases, blastp,z))
+
+
+complete_cases_cv_pep <- reorder_(complete_cases_cv_pep, data_sbt_complete_cases)
+complete_cases_pfam_pep <- reorder_(complete_cases_pfam_pep, data_sbt_complete_cases)
+complete_cases_go_pep <- reorder_(complete_cases_go_pep, data_sbt_complete_cases)
+complete_cases_swissprot_pep <- reorder_(complete_cases_swissprot_pep, data_sbt_complete_cases)
+
+
+# # sanity-check the ids per database
+identical(rownames(data_sbt_complete_cases), complete_cases_cv_pep$transcript)
+identical(rownames(data_sbt_complete_cases), complete_cases_pfam_pep$transcript)
+identical(rownames(data_sbt_complete_cases), complete_cases_go_pep$transcript)
+identical(rownames(data_sbt_complete_cases), complete_cases_swissprot_pep$transcript)
+
+samples <- names(data_sbt_complete_cases)
+
+
+dim(save_complete_nuc <- cbind(complete_cases_cv_pep, 
+                               select(complete_cases_pfam_pep, 
+                                      -samples, -gene, -transcript, -protein),
+                               select(complete_cases_go_pep, 
+                                      -samples, -gene, -transcript, -protein),
+                               select(complete_cases_swissprot_pep,
+                                      -samples, -gene, -transcript, -protein)))
+
+write.table(save_complete_nuc, file = paste0(dir, name, '_cv_pfam_goPfam_swissprot_nuc.txt'), sep="\t", 
+            row.names = F, col.names = T)
 ```
 
 ```{r parse annot & quantification}
@@ -267,42 +406,60 @@ tt[!duplicated(tt$transcript, fromLast = TRUE) ,]
 
 # keep the last transcript with highes evalue
 # Save Quantitative Annotation
-save_QA <- function(x,y) {
-  z <- data_sbt_non_annotated
+save_QA <- function(x,y, non_annot) {
   db_unique <- y[!duplicated(y$transcript, fromLast = TRUE) ,]
-  results <- cbind(x, db_unique[db_unique$transcript %in% rownames(x),])
+  a <- db_unique[db_unique$transcript %in% rownames(x),]
+  a <- a[match(rownames(x), a$transcript),]
   
- add <- matrix(ncol = ncol(z) + ncol(y), nrow = nrow(z))
- add[,1:ncol(z)] <- as.matrix(z)
- add <- as.data.frame(add)
- names(add) <- c(names(as.data.frame(z)), names(y))
-  
- results <- rbind(results, add)
-  
- return(results)
+  if(identical(rownames(x), as.character(a$transcript))) {
+    results <- cbind(x, a)
+  }
+  if(exists('non_annotated')) {
+    z <- non_annot
+    add <- matrix(ncol = ncol(z) + ncol(y), nrow = nrow(z))
+    add[,1:ncol(z)] <- as.matrix(z)
+    add <- as.data.frame(add)
+    names(add) <- c(names(as.data.frame(z)), names(y))
+    rownames(add) <- rownames(z)
+    results0 <- rbind(results, add)
+    
+    return(results0)
+    
+    } else {
+      results0 <- results
+      return(results0)
+    
+  }
 }
 
+# x <- data_sbt_pfam
 # z <- data_sbt_non_annotated
 # y <- pfam
 # add <- matrix(ncol = ncol(z) + ncol(y), nrow = nrow(z))
 # add[,1:ncol(z)] <- as.matrix(z)
 # add <- as.data.frame(add)
 # names(add) <- c(names(as.data.frame(z)), names(y))
- 
-dim(save_pfam <- save_QA(data_sbt_pfam, pfam))
-dim(save_blastx <- save_QA(data_sbt_blastx, blastx))
-dim(save_go <- save_QA(data_sbt_go, go))
+# rownames(add) <- rownames(z)
+# 
+# db_unique <- y[!duplicated(y$transcript, fromLast = TRUE) ,]
+# a <- db_unique[db_unique$transcript %in% rownames(x),]
+# 
+# identical(rownames(x), as.character(a$transcript))
+# a <- a[match(rownames(x), a$transcript),]
+# identical(rownames(x), as.character(a$transcript))
+# 
+# results <- cbind(x, a)
+#  
+dim(save_pfam <- save_QA(data_sbt_pfam, pfam, data_sbt_non_annotated))
+dim(save_blastx <- save_QA(data_sbt_blastx, blastx, data_sbt_non_annotated))
+dim(save_go <- save_QA(data_sbt_go, go, data_sbt_non_annotated))
 
-dim(save_cv_nuc <- save_QA(data_sbt_cv_nuc, blastn_genome))
-dim(save_cv_prot <- save_QA(data_sbt_cv_prot, blastp_genome))
+dim(save_cv_nuc <- save_QA(data_sbt_cv_nuc, blastn_genome, data_sbt_non_annotated))
+dim(save_cv_prot <- save_QA(data_sbt_cv_prot, blastp_genome, data_sbt_non_annotated))
 
-dim(save_cg_nuc <- save_QA(data_sbt_cg_nuc, blastn_cgigas))
-dim(save_cg_prot <- save_QA(data_sbt_cg_prot, blastp_cgigas))
+dim(save_cg_nuc <- save_QA(data_sbt_cg_nuc, blastn_cgigas, data_sbt_non_annotated))
+dim(save_cg_prot <- save_QA(data_sbt_cg_prot, blastp_cgigas, data_sbt_non_annotated))
 
-# And save complete cases:
-
-#dim(save_complete_cases <- save_QA(data_sbt_complete_cases, rownames(complete_annot)))
-#dim(data_sbt_complete_cases <- data_sbt_1[rownames(data_sbt_1) %in% rownames(complete_annot), ])
 ```
 
 ```{r save results}
@@ -330,6 +487,36 @@ write.table(save_cg_prot, file = paste0(dir, name, '.CG_prot.txt'), sep="\t",
 
 ```
 
+```{r REMOVE Get uniprot and orf genome data}
+annot_matrix <- matrix(ncol = 2, nrow = length(rownames(data_sbt_1)))
+annot_matrix[,1] <- rownames(data_sbt_1) %in% go$transcript
+annot_matrix[,2] <- rownames(data_sbt_1) %in%  blastn_genome$transcript
+
+
+annot_tbl <- data.frame(annot_matrix)
+names(annot_tbl) <- c('go', 'cv_prot')
+rownames(annot_tbl) <- rownames(data_sbt_1)
+
+# complate cases of annotation:
+boolean.integer <- function(arg1) {
+  arg1 [arg1 == "TRUE"] <- 1
+  arg1 [arg1 == "FALSE"] <- 0
+  arg1 <- as.integer(arg1)
+}
+
+annot_tbl_boo <- apply(annot_tbl, 2, boolean.integer)
+annot_tbl_boo$complete <- rowSums(annot_tbl_boo)
+dim(complete_annot <- annot_tbl[annot_tbl_boo$complete == 2,])
+
+# And save complete cases:
+dim(data_sbt_complete_cases <- data_sbt_1[rownames(data_sbt_1) %in% rownames(complete_annot), ])
+
+
+dim(complete_cases_go <- save_QA(data_sbt_complete_cases, go))
+
+#dim(data_sbt_complete_cases <- data_sbt_1[rownames(data_sbt_1) %in% rownames(complete_annot), ])
+
+```
 ## quit()
 
 ```{r}
@@ -348,10 +535,10 @@ write.table(save_cg_prot, file = paste0(dir, name, '.CG_prot.txt'), sep="\t",
 # Trinotate Trinotate.sqlite report > Trinotate.xls
 ```
 
-### Visualization
+### Some Visualization
 
 ```{r PcoA plot, echo = FALSE}
-pca <- prcomp(t(y), center = TRUE, scale. = FALSE)
+pca <- prcomp(t(count_tbl), center = TRUE, scale. = FALSE)
 
 ## make a scree plot
 pca.var <- pca$sdev^2
@@ -525,4 +712,5 @@ superheat(annot_tbl_boo)
 
 
 ```
+
 
