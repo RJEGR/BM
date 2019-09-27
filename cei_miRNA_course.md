@@ -75,12 +75,20 @@ cd curso2019
 ls
 ```
 
-4) Realizamos la copia del directorio `data_min`, en caso de no encontrar la carpeta dentro de tu directorio de trabajo:
+4) Realizamos la copia del directorio `data_min`, **en caso de no encontrar la carpeta dentro de tu directorio de trabajo**:
 
 ```bash
 cp -r /LUSTRE/bioinformatica_data/curso2019/accounts/cei/data_min .
 cd data_min
 ```
+
+5) Revisamos que tengamos la ruta de progamas en nuestra sesión `echo $PATH` . **En caso de no contar con la ruta de los programas con los que trabajaremos:**
+
+```bash
+export PATH=/LUSTRE/bioinformatica_data/genomica_funcional/cei/bin$PATH
+```
+
+Bien hecho !!!
 
 
 
@@ -203,9 +211,5 @@ export PATH=/LUSTRE/apps/bioinformatica/samtools-1.7/bin:$PATH
 
 # Para usarlos en conjunto con Shortstack
 
-export PATH=/LUSTRE/apps/bioinformatica/Shortstack:/LUSTRE/apps/bioinformatica/samtools-1.7/bin:/LUSTRE/apps/bioinformatica/bowtie-1.2.1.1:$PATH
+export PATH=/LUSTRE/apps/bioinformatica/Shortstack:/LUSTRE/apps/bioinformatica/samtools-1.7/bin:/LUSTRE/apps/bioinformatica/bowtie-1.2.1.1:$PATH`
 ```
-
-
-
-Por instalar: `ViennaRNA`
