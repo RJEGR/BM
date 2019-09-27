@@ -1,32 +1,92 @@
-# Workshop
+# Análisis de datos de secuenciación masiva de pequeños RNAs no-codificantes
 
-## Small non coding RNA
-
-> 27 - 28 de septiembre en CICESE
+>  27 - 28 de septiembre en CICESE
 >
 > PhD Cei Abreu, LANGEBIO
 
-#### Testing ...
+> Descripción:
 
-Starts using virtual conection to the cluster via ssh
+Todos los seres vivos, además de transcribir genes que codifican para proteínas, lo hacen para
+una amplia variedad de genes llamados no-codificantes. Muchos organismos también producen
+RNAs a partir de templados de RNA. Por razones prácticas los RNAs no-codificantes se
+clasifican en cortos (pequeños) y largos. Quizá la clase más famosa de RNAs pequeños son
+los microRNAs, por tratarse de moléculas esenciales para el desarrollo de plantas y animales.
+La tecnología de secuenciación masiva más popular de los últimos años (Illumina) permite
+exploraciones muy completas de los RNAs pequeños de una amplia diversidad de muestras,
+desde organismos u órganos completos, material extracelular, organismos en interacción o
+inclusive células individuales. En este curso los participantes aprenderán a apreciar las
+peculiaridades y limitaciones de la secuenciación de RNAs pequeños. Usando R dentro de
+RStudio, y algunas herramientas en Linux, aprenderán también a analizar y explorar datos de
+secuenciación masiva de RNAs pequeños, así como interpretar los resultados obtenidos.
+
+## Instrucciones
+
+#### Ingresando al cluster
+
+0) Desde windows ingresa a la herramienta **PuTTY**, en mac y linux desde tu terminal
+
+1) Selecciona una cuenta e ingresa al cluster
 
 ```bash
-ssh rgomez@omica
-# Password: ******
+ssh curso01@omica
+password: RNA-cicese01
 ```
 
-Set your work directory (Eg. $HOME/) and load the most current version of R available: `module load R-3.6.1` , Then start 
+| Cuenta  |    Clave     |
+| :-----: | :----------: |
+| curso01 | RNA-cicese01 |
+| curso02 | RNA-cicese02 |
+| curso03 | RNA-cicese03 |
+| curso04 | RNA-cicese04 |
+| curso05 | RNA-cicese05 |
+| curso06 | RNA-cicese06 |
+| curso07 | RNA-cicese07 |
+| curso08 | RNA-cicese08 |
+| curso09 | RNA-cicese09 |
+| curso10 | RNA-cicese10 |
+| curso11 | RNA-cicese11 |
+| curso12 | RNA-cicese12 |
+| curso13 | RNA-cicese13 |
+| curso14 | RNA-cicese14 |
+| curso15 | RNA-cicese15 |
+| curso16 | RNA-cicese16 |
+| curso17 | RNA-cicese17 |
+| curso18 | RNA-cicese18 |
+| curso19 | RNA-cicese19 |
+| curso20 | RNA-cicese20 |
+| curso21 | RNA-cicese21 |
+| curso22 | RNA-cicese22 |
+| curso23 | RNA-cicese23 |
+| curso24 | RNA-cicese24 |
+|         |              |
 
-```R
-ip <- installed.packages()[,c(1,3:4)]
-rownames(ip) <- NULL
-ip <- ip[is.na(ip[,3]),1:2,drop=FALSE]
-print(ip, row.names=FALSE)
+
+
+2) Una vez ingresado al cluster, ingresamos las siguientes lineas de comando:
+
+```
+bash ~/accesa-nodo
+cd curso2019
 ```
 
-If local machine is used, please attend the follow instalation step:
+3) Revisamos los archivos con los que trabajaremos:
 
-**Installation**
+```bash
+ls
+```
+
+4) Realizamos la copia del directorio `data_min`, en caso de no encontrar la carpeta dentro de tu directorio de trabajo:
+
+```bash
+cp -r /LUSTRE/bioinformatica_data/curso2019/accounts/cei/data_min .
+cd data_min
+```
+
+
+
+# Trabajando con R
+
+**0) Instalación** 
 
 ```R
 install.packages("BiocManager")
@@ -41,7 +101,7 @@ BiocManager::install()
 BiocManager::install(.pkgs)
 ```
 
-Check Installation
+**1) Cargando los paquetes**
 
 ```R
 
