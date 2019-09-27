@@ -88,4 +88,9 @@ cd data_min
 export PATH=/LUSTRE/bioinformatica_data/genomica_funcional/cei/bin$PATH
 ```
 
-Bien hecho !!!
+6) Vamos al tutorial del curso en:
+
+[Prácticas de Bioinformática para el análisis de datos de sRNA-Seq](http://datos.langebio.cinvestav.mx/~cei/cursos/CICESE/)
+
+
+
