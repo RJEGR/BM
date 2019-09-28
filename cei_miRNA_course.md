@@ -94,7 +94,7 @@ export PATH=/LUSTRE/bioinformatica_data/genomica_funcional/cei/bin$PATH
 
 
 
-# Trabajando con R 
+# Trabajando con R (version 3.5 o superior)
 
 **0) Instalación** 
 
