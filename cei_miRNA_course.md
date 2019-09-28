@@ -94,3 +94,39 @@ export PATH=/LUSTRE/bioinformatica_data/genomica_funcional/cei/bin$PATH
 
 
 
+# Trabajando con R 
+
+**0) Instalación** 
+
+```R
+install.packages("BiocManager")
+
+BiocManager::install()
+
+.pkgs <- c("Rsamtools", "GenomicFeatures", "GenomicAlignments",
+        "ggplot2", "pheatmap", "RColorBrewer","AnnotationDbi",
+        "rtracklayer","GenomicRanges","edgeR","statmod","readr","biomaRt",
+        "Biostrings","Biobase","knitr","affy","RCurl")
+
+BiocManager::install(.pkgs)
+```
+
+**1) Cargando los paquetes**
+
+```R
+.inst <- .pkgs %in% installed.packages()
+
+if(any(!.inst)) {
+    if (!requireNamespace("BiocManager", quietly = TRUE))
+        install.packages("BiocManager")
+    BiocManager::install(.pkgs[!.inst], ask = F)
+}
+
+# Load packages into session, and print package version
+sapply(c(.pkgs), require, character.only = TRUE)
+```
+
+
+
+
+
