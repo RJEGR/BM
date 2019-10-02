@@ -130,3 +130,31 @@ sapply(c(.pkgs), require, character.only = TRUE)
 
 
 
+## **Linux tools** 
+
+- samtools [http://www.htslib.org/](http://www.htslib.org/)
+- bowtie1 [http://bowtie-bio.sourceforge.net/index.shtml](http://bowtie-bio.sourceforge.net/index.shtml)
+- ShortStack https://github.com/MikeAxtell/ShortStack
+
+
+
+```bash
+# Para usarlo agregar esta trayectoria a la variable ambiental PATH:
+export PATH=/LUSTRE/apps/bioinformatica/Shortstack:$PATH
+Shortstack
+
+#Este requiere de las otras aplicaciones que solicitaban, bowtie1 y samtools, del primero se encuentran las versiones 1.1.2 y 1.2.1.1 en las carpetas:
+# <-- versión 1.1.2
+export PATH=/LUSTRE/apps/bioinformatica/bowtie1:$PATH   
+
+# <-- versión 1.2.1.1
+export PATH=/LUSTRE/apps/bioinformatica/bowtie-1.2.1.1:$PATH  
+
+# y samtools
+export PATH=/LUSTRE/apps/bioinformatica/samtools-1.7/bin:$PATH
+
+# Para usarlos en conjunto con Shortstack
+
+export PATH=/LUSTRE/apps/bioinformatica/Shortstack:/LUSTRE/apps/bioinformatica/samtools-1.7/bin:/LUSTRE/apps/bioinformatica/bowtie-1.2.1.1:$PATH`
+```
+
