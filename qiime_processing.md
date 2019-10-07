@@ -12,7 +12,7 @@ sbatch denoise-paired.sh 150 146 test_demux_seqs.qza sampleMfile
 sbatch filter-features.sh test_table.qza 2 sampleMfile 
 
 # 4) Classifiyng features
-...
+
 # 5) Write a report in R
 
 
@@ -229,6 +229,10 @@ qiime feature-table tabulate-seqs \
   --i-data ${prefix}_rep-seqs_table_${freq}_filtered.qza \
   --o-visualization ${prefix}_rep-seqs_table_${freq}_filtered.qzv
 
+# 3) taxonomy filtering
+
+
+
 mkdir -p tabular_files
 
 # export feature-table
@@ -248,16 +252,64 @@ exit
 
 ### Classify features
 
+0) save this code with the name script `Classify-feature.sh`
+
+> Example: sbatch Classify-feature.sh test_rep-seqs_table_3_filtered.qza 0.8 w2pr2_worms_API02.fasta.qza w2pr2_worms_API02.tax.qza
+
 ```bash
+#!/bin/bash
+#SBATCH --job-name=qiime-cla
+#SBATCH -N 1
+#SBATCH --mem=100GB
+#SBATCH --ntasks-per-node=24
+#SBATCH -t 6-00:00:00
+
+# Load qiime
+
+module load miniconda3-python-3.5
+source activate quiime2-2018.0
+
+query=$1
+identity=$2 # [from 0 to 1]
+refreads=$3
+reftax=$4
+
+tag=$(echo $reftax | cut -d'.' -f1)
+taxonomy=$(echo $tag"_vs_"${query%.qza}.qza)
+
 qiime feature-classifier classify-consensus-blast \
-	--p-perc-identity 0.8 \
-  --i-query test_rep-seqs.qza \
-  --i-reference-reads  w2pr2_worms_API02.fasta.qza \
-  --i-reference-taxonomy w2pr2_worms_API02.tax.qza \
-  --o-classification test_rep-seqs.qza
+	--p-perc-identity $identity \
+  --i-query $query \
+  --i-reference-reads  $refreads \
+  --i-reference-taxonomy $reftax \
+  --o-classification $taxonomy
+
+exit
 
 
 ```
+
+1) Remove min-frequency-features and exclude _unassign_
+
+```bash
+#Remove min-frequency-features
+${prefix}_table_${freq}_filtered.qza
+  
+qiime taxa filter-table \
+  --i-table ${prefix}_table_${freq}_filtered.qza \
+  --i-taxonomy $taxonomy \
+  --p-exclude Unassigned \
+  --o-filtered-table ${prefix}_table_${freq}_filtered_assigned.qza
+
+# TENEMOS UN ERROR CON LA CLASIFICACION
+
+qiime feature-table summarize \
+  --i-table XIXIMI4-PE_table_No_Unas.qza \
+  --o-visualization XIXIMI4-PE_table_No_Unas.qzv \
+  --m-sample-metadata-file ../XIXIMI4_Metadata.txt
+```
+
+
 
 
 
