@@ -18,7 +18,7 @@ sbatch filter-features.sh test_table.qza 2 sampleMfile
 
 ```
 
-
+Explanation script-to-script below.
 
 The framework version of qiime are:
 
@@ -179,8 +179,6 @@ The `$metadt` variable must contain first column as SampleID from data. Column o
 
 Well done, now you can filter and make some ecological analysis within qiime or other plataform.
 
-I recomended to check your 
-
 ### Filtering count-data
 
 save the follow script as `filter-features.sh`
@@ -243,12 +241,54 @@ qiime tools export \
   --input-path ${prefix}_rep-seqs_table_${freq}_filtered.qza \
   --output-path tabular_files
 
-biom convert -i tabular_files/feature-table.biom -o ${prefix}_feature_table_${freq}_filtered.qza .tsv --to-tsv
+biom convert -i tabular_files/feature-table.biom -o ${prefix}_feature_table_${freq}_filtered.qza.tsv --to-tsv
 
 exit
 ```
 
+### Classify features
+
+```bash
+qiime feature-classifier classify-consensus-blast \
+	--p-perc-identity 0.8 \
+  --i-query test_rep-seqs.qza \
+  --i-reference-reads  w2pr2_worms_API02.fasta.qza \
+  --i-reference-taxonomy w2pr2_worms_API02.tax.qza \
+  --o-classification test_rep-seqs.qza
+
+
+```
+
+
+
 ### Convertion files
+
+#### Convert taxonomy
+
+>  Take less than 1-2 minute
+
+We import these data into QIIME 2 Artifacts. Ex. the  reference taxonomy file (`w2pr2_worms_API02.tax`) is a tab-separated (TSV) file without a header, we must specify `HeaderlessTSVTaxonomyFormat` as the *source format* since the default *source format* requires a header.
+
+```bash
+qiime tools import \
+  --input-path w2pr2_worms_API02.fasta \
+  --output-path w2pr2_worms_API02.fasta.qza \
+  --type 'FeatureData[AlignedSequence]'
+  
+# 2 TSVTaxonomyFormat file
+
+qiime tools import --type 'FeatureData[Taxonomy]' --input-format 'HeaderlessTSVTaxonomyFormat' --input-path w2pr2_worms_API02.tax --output-path w2pr2_worms_API02.tax.qza
+	
+```
+
+Additional formats and import types:
+
+```bash
+qiime tools import --show-importable-types
+qiime tools import --show-importable-formats
+```
+
+#### Convert outputs
 
 ```bash
 #!/bin/bash
@@ -263,21 +303,23 @@ exit
 module load miniconda3-python-3.5
 source activate quiime2-2018.0
 
-# ====
 
-mkdir tabular_files
+mkdir -p tabular_files
 
+# export feature-table
+qiime tools export \
+  --input-path ${prefix}_table_${freq}_filtered.qza \
+  --output-path tabular_files
+
+# export sequence table
 qiime tools export \
   --input-path ${prefix}_rep-seqs_table_${freq}_filtered.qza \
   --output-path tabular_files
 
-biom convert -i tabular_files/feature-table.biom -o ${prefix}_feature_table_${freq}_filtered.qza .tsv --to-tsv
+biom convert -i tabular_files/feature-table.biom -o ${prefix}_feature_table_${freq}_filtered.qza.tsv --to-tsv
 
 exit
 
-qiime tools export --input-path table.qza_table_3_filtered.qza --output-path tabular_files
-cd tabular_files
-biom convert -i feature-table.biom -o feature-table.tsv --to-tsv
 ```
 
 workdir Tes:
