@@ -1,10 +1,92 @@
 # NCBI Entrez Direct UNIX E-utilities 
 
+**additional tags (0ctuber 08, 2019):**
+
+txid7898[Organism:exp] AND COI AND 2016/01/01:2019/09[MDAT] 
+
+Con esta busqueda salieron **101,647** seqs falta usar "BARCODE" y otros tags.
+
+- Al usar el tag "BARCODE" en la busqueda de secuencias despues del 2015: **100,273**
+- Al filtrar secuencias con abreviaciones redundante al nivel especie: **89,915**
+- Al filtrar secuencias menores o igual a 200 pares de bases: **00000**
+
+## Busqueda de secuencias
+
+```bash
+esearch -db nucleotide -query "CO1[GENE] OR COI[GENE] OR COX1[GENE] OR COXI[GENE] OR BARCODE AND "txid7898"[Organism:exp] AND COI AND "2016/01/01:2019/09"[MDAT]" | efetch -format fasta > CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta
+```
+
+## Limpiamos la base removiendo Abreviaciones:
+
+Taxa were filtered according to the concent of the species field so that only fully identified taxa with a complete latin binomial (genus and species) were retained. Entries that contained the abbreviations. `sp.`, `nr.`, `aff.`, or `cf.` were discarded (Teresita porter et al 2018). Also include abbreviations `UNVERIFIED` and `environmental` (Miguel M 2019).
+
+1) Wrangling:
+
+```bash
+# 1)
+grep '^>' BARCODE_txid7898_CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta | sed 's/>//g' > BARCODE_txid7898_CO1_COI_COX1_COXI_GENE_Eukaryota_nr.headers 
+# 2)
+cat BARCODE_txid7898_CO1_COI_COX1_COXI_GENE_Eukaryota_nr.headers | awk '{print $2,$3}' | sort | uniq -c | sort -n > species_frequency.txt
+
+grep 'sp.$' species_frequency.txt # 6671
+grep 'cf.$' species_frequency.txt # 1043
+grep 'aff.$' species_frequency.txt # 191
+grep 'UNVERIFIED' species_frequency.txt  # 1363
+grep 'environmental' species_frequency.txt # 1090
+grep 'nr.$' species_frequency.txt # 0
+
+# 6671 + 1043 + 191 + 1363 + 1090 + 0 = 10358
+
+# to sum number of sequence:
+awk '{ sum += $1; } END { print sum; }' "$@" species_frequency.txt # 100273
+
+
+```
+
+2) Then filter:
+
+```bash
+file=BARCODE_txid7898_CO1_COI_COX1_COXI_GENE_Eukaryota_nr.headers
+grep 'sp.' $ file
+```
+
+
+
+```bash
+egrep 'sp.$|cf.$|aff.$|UNVERIFIED|environmental|nr.$' species_frequency.txt | awk '{ sum += $1; } END { print sum; }' "$@" # Sanity check
+
+# Linearize fasta to grep inVerte and format back to fasta
+awk -f linearizefasta.awk < BARCODE_txid7898_CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta | egrep -v 'sp.$|cf.$|aff.$|UNVERIFIED|environmental|nr.$' | tr "\t" "\n" > ncbi_complete.fasta
+
+# Sanity check
+grep -c "^>" ncbi_complete.fasta # 97820 <-- error
+
+cat ncbi_complete.fasta |awk '{print $2,$3}' | sort | uniq -c | sort -n > complete_freq.txt
+```
+
+
+
+`linearizefasta.awk`
+
+```bash
+/^>/ {printf("%s%s\t",(N>0?"\n":""),$0);N++;next;}
+     {printf("%s",$0);}
+END  {printf("\n");}
+```
+
+
+
+## First intention (Above agoust 2019)
+
+
+
 It is available to download from the NCBI website [here](ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect) or [here](https://www.ncbi.nlm.nih.gov/books/NBK179288/)
 
 Dowload full ncbi COI barcodes data-base using ncbi nucleotide search as Teresita et.al (2018):
 
 >  CO1[GENE] OR COI[GENE] OR COX1[GENE] OR COXI[GENE] AND "Eukaryota"[Organism] 
+
+
 
 
 
@@ -15,7 +97,6 @@ Dowload full ncbi COI barcodes data-base using ncbi nucleotide search as Teresit
 - Filename: CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta
 - **Cluster path**: /LUSTRE/bioinformatica_data/genomica_funcional/MG_COI/dbs/ncbi/CO1_COI_COX1_COXI_GENE_Eukaryota_nr/CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta
 - Downolad method: **e-utilities**
-- 
 
 ```bash
 esearch -db nucleotide -query "CO1[GENE] OR COI[GENE] OR COX1[GENE] OR COXI[GENE] AND "Eukaryota"[Organism] " | efetch -format fasta > CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta
@@ -112,7 +193,11 @@ exit
 
 3) Cut the leray fragment
 
-> primer GGWACWGGWTGAACWGTWTAYCCYCC TAIACYTCIGGRTGICCRAARAAYCA
+> primer 
+>
+> GGWACWGGWTGAACWGTWTAYCCYCC 
+>
+> TAIACYTCIGGRTGICCRAARAAYCA
 
 ```bash
 #!/bin/bash
