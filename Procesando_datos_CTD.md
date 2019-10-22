@@ -1,6 +1,14 @@
 # Procesando datos CTD
 
-0) 
+Los archivos `cnv` contienen una matriz de datos continuos asociados a variables abióticas de interés. Para cada estación de los cruceros realizados se realizó uno o más lances que recolectaron la información. El reto para esta actividad fue manipular ( *n* estaciones ) * (*x* crucero)  de archivos de dato continuos. Se elaboró código que resuelve: 
+
+i) re-etiquetar el nombre de archivos cnv a un formato legible para los usuarios de la información, 
+
+ii) extraer un subconjunto de datos para cada una de las estaciones a lo largo de los cruceros, 
+
+iii) almacenar las variables de interés (Temperatura, Salinidad, Oxígeno, Fluorescencia) de cada uno de los lances a un solo documento
+
+0) Inicio 
 
 ```bash
 head -n31 lan001b.cnv
@@ -104,6 +112,11 @@ for i in *.csv
 do
    awk '$2 <= 200.0 {print $13, $14, $2, $3, $5, $6, $7, $11}' $i > ${i%.csv}_200m.csv
 done
+
+for i in *.csv
+do
+   awk '$2 <= 200.0 {print $11, $12, $2, $3, $5, $6, $7, $10}' $i > ${i%.csv}_200m.csv
+done
 ```
 
 
@@ -154,8 +167,4 @@ do
 	m=$(awk '{x+=$2; next} END{print x/NR}' $i)
 	echo "$f $m"
 done
-	
 ```
-
-
-
