@@ -1,6 +1,14 @@
 # NCBI Entrez Direct UNIX E-utilities 
 
+It is available to download from the NCBI website [here](ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect) or [here](https://www.ncbi.nlm.nih.gov/books/NBK179288/)
+
+Dowload full ncbi COI barcodes data-base using ncbi nucleotide search as Teresita et.al (2018):
+
+> CO1[GENE] OR COI[GENE] OR COX1[GENE] OR COXI[GENE] AND "Eukaryota"[Organism] 
+
 **La descarga se realizo con fecha Octuber 08, 2019:**
+
+- Downolad method: **e-utilities**
 
 - Al usar el tag "BARCODE" en la busqueda de secuencias despues del 2015: **100,273**
 - Al filtrar secuencias con abreviaciones redundante en nivel especie: **89,889**
@@ -121,10 +129,8 @@ Files are ready to use
 ## De-replicate sequences
 
 ```bash
-no
+usearch -derep_fulllength peces_bold_no_gaps.fasta -output derep.fa
 ```
-
-
 
 ## Primer design
 
@@ -396,8 +402,8 @@ ggplot(data = alluv,
             aes.bind = TRUE, lode.guidance = "rightward") +
   theme_minimal() 
 #+
-#  ggtitle("The frequency distribution of meroplankton in the GoM.") +
-#  xlab("Level of resolution") + ylab("Number of ASVs")
+#  ggtitle("") +
+#  xlab("") + ylab("")
 
 ```
 
@@ -579,11 +585,7 @@ use vertebrate-mitocondrial
 
 
 
-It is available to download from the NCBI website [here](ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect) or [here](https://www.ncbi.nlm.nih.gov/books/NBK179288/)
-
-Dowload full ncbi COI barcodes data-base using ncbi nucleotide search as Teresita et.al (2018):
-
->  CO1[GENE] OR COI[GENE] OR COX1[GENE] OR COXI[GENE] AND "Eukaryota"[Organism] 
+>  
 
 
 
@@ -595,51 +597,7 @@ Dowload full ncbi COI barcodes data-base using ncbi nucleotide search as Teresit
 - Size : **5.2G** 
 - Filename: CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta
 - **Cluster path**: /LUSTRE/bioinformatica_data/genomica_funcional/MG_COI/dbs/ncbi/CO1_COI_COX1_COXI_GENE_Eukaryota_nr/CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta
-- Downolad method: **e-utilities**
-
-```bash
-esearch -db nucleotide -query "CO1[GENE] OR COI[GENE] OR COX1[GENE] OR COXI[GENE] AND "Eukaryota"[Organism] " | efetch -format fasta > CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta
-```
-
-Further details of COI barcodes
-
-```bash
-# XML format
-esearch -db nucleotide -query "CO1[GENE] OR COI[GENE] OR COX1[GENE] OR COXI[GENE] AND "Eukaryota"[Organism] " | efetch -db  taxonomy -format xml > CO1_COI_COX1_COXI_GENE_Eukaryota_nr.xml
-
-# get lineage 
-grep 'OrgName_lineage' CO1_COI_COX1_COXI_GENE_Eukaryota_nr.taxonomy
-
-# get 
-grep 'OrgMod_subname'  CO1_COI_COX1_COXI_GENE_Eukaryota_nr.taxonomy
-```
-
-
-
->  Additional steps [here](http://bioinformatics.cvr.ac.uk/blog/ncbi-entrez-direct-unix-e-utilities/)
-
-
-
-## Taxonomy
-
-Get the lineage of the sequences:
-
-1) 
-
-```bash
-# 1 get id
-grep '^>' CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta  | awk '{print $1}' | sed 's/>//' > ids
-
-# 2 search id lineage
-for i in $(cat ids); do esearch -db nucleotide -query $i | efetch -format xml | xtract -pattern Org-ref -element Object-id_id,Org-ref_taxname,OrgMod_subname,OrgName_lineage,Textseq-id_accession,OrgName_div,BinomialOrgName_genus,BinomialOrgName_species; done > CO1_COI_COX1_COXI_GENE_Eukaryota_nr.xtract.Org-ref-element
-```
-
-2) 
-
-```bash
-# full lineage w/ taxid
-esearch -db protein -query "MN119470.1"| elink -target taxonomy |efetch -format xml |xtract -pattern TaxonSet -element Lineage
-```
+- Downolad method: **e-utilities
 
 
 
