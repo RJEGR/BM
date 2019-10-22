@@ -5,6 +5,7 @@
 - Al usar el tag "BARCODE" en la busqueda de secuencias despues del 2015: **100,273**
 - Al filtrar secuencias con abreviaciones redundante en nivel especie: **89,889**
 - Al filtrar secuencias menores o igual a 200 pares de bases: **89,847**
+  - Se cuenta con informacion taxonomica para estas secuencias: **VERDADERO**
 - al de-replicar secuencias: **55.248**
 
 ## Add API to faster access
@@ -193,13 +194,9 @@ mafft --thread $SLURM_NPROCS $input > $output
 exit
 ```
 
-4) 
-
-
-
 ## Get the complete taxonomy
 
-Esta es una version para recuperar el linaje de alguna secuencia del ncbi basado en el identificador gi
+Esta es una version para recuperar el linaje de alguna secuencia del ncbi basado en el identificador gi y usando la agrupacion de generos.
 
 ```bash
 awk '{print $1}' ncbi_complete.headers | sed 's/>//'  > ids
@@ -214,8 +211,8 @@ Then grep genus by genus
 
 ```bash
 cat ncbi_complete_genus | awk '{print $2}' > genusList
-
-# time demand
+# Debido al procesamiento de usar la segunda columna para agrupar generos, perdemos detalles del identificador acc MH925110.1, por lo que buscamos manualmente su linaje y adjutamos al final dentro del archivo >> accTaxId
+# Make the ids files per genus . time demand
 
 while IFS= read -r pattern; do grep $pattern ncbi_complete.headers | awk '{print $1}' > ${pattern}.ids & done < genusList; wait; echo "Grouping  genus done"
 
@@ -243,9 +240,9 @@ ls *taxId | wc -l # must be ~ 3193
 wc -l *taxId | sort -n | head
 
 # checkpoint
-ls *taxId | awk '{gsub(/[.]/, " " , $0); print $1}' | sort > completedtList
+ls *taxId | awk '{gsub(/[.]/, " " , $0); print $1}' | sort > DowloadedList
 
-diff completedtList genusList | awk '">" {gsub(/>/,"", $0); print}' | sort > checkpointList
+diff DowloadedList genusList | awk '">" {gsub(/>/,"", $0); print}' | sort > checkpointList
 
 wc -l checkpointList # must be equal zero
 
@@ -260,7 +257,7 @@ done
 # Then,
 # get taxonomy
 
-cat *taxId | awk '{print $2}' | sort | uniq > completeTaxIds
+cat *taxId | awk '{print $2}' | sort | uniq > completeTaxIds # 10866 number of genus
 
 for i in $(cat completeTaxIds); do efetch -db taxonomy -id $i -format xml | \
 xtract -pattern Taxon -tab "," -first TaxId ScientificName \
@@ -271,33 +268,140 @@ xtract -pattern Taxon -tab "," -first TaxId ScientificName \
 -block "*/Taxon" -match "Rank:order" -ORDR ScientificName \
 -block "*/Taxon" -match "Rank:family" -FMLY ScientificName \
 -block "*/Taxon" -match "Rank:genus" -GNUS ScientificName \
--group Taxon -tab "," -element "&KING" "&PHYL" "&CLSS" "&ORDR" "&FMLY" "&GNUS"; done
+-group Taxon -tab ";" -element "&KING" "&PHYL" "&CLSS" "&ORDR" "&FMLY" "&GNUS"; done > completeTaxIds.taxonomy
+
+# Sanity check
+wc -l completeTaxIds.taxonomy # 10866 number of linage recovery
+cut -d',' -f1 completeTaxIds.taxonomy | sort > DowmloadedLinage
+diff DowmloadedLinage completeTaxIds | sort # must be zero
+
+# Check Actinopteri class
+grep 'Actinopteri' -c completeTaxIds.taxonomy # 10862
+
+cut -d',' -f5 completeTaxIds.taxonomy | sort | uniq -c | sort -n
+#   1 Chordata
+#   4 Cladistia
+#10861 Actinopteri
+
+# clean temporally files
+rm *.ids
+
+cat *.taxId | sort | uniq > accTaxId
+
 
 ```
 
+Encontraremos el error de desfase de los linajes, por ejemplo tenemos 579 ordenes con el símbolo `-` en el nivel orden. 
 
+Parse taxonomy to fasta and separe fasta by group
 
 ```bash
-# 1) 
-epost -db nuccore -format acc -input ids | \
-esummary | \
-xtract -pattern DocumentSummary -element AccessionVersion TaxId > Astyanax.taxId
+awk -f linearizefasta.awk < ncbi_complete.fasta | sort -k1,1 | sed 's/^>//g' > ncbi_complete.fasta.table
 
-#  cut -f2 taxId | sort | uniq | tr '\n' ','
+# accTaxId
+# parse both files:
 
-# 2
-efetch -db taxonomy -id 1053555,1053557,1123824,1204590,1931392,2579964,7994 -format xml | \
-xtract -pattern Taxon -tab "," -first TaxId ScientificName \
--group Taxon -KING "(-)" -PHYL "(-)" -CLSS "(-)" -ORDR "(-)" -FMLY "(-)" -GNUS "(-)" \
--block "*/Taxon" -match "Rank:kingdom" -KING ScientificName \
--block "*/Taxon" -match "Rank:phylum" -PHYL ScientificName \
--block "*/Taxon" -match "Rank:class" -CLSS ScientificName \
--block "*/Taxon" -match "Rank:order" -ORDR ScientificName \
--block "*/Taxon" -match "Rank:family" -FMLY ScientificName \
--block "*/Taxon" -match "Rank:genus" -GNUS ScientificName \
--group Taxon -tab "," -element "&KING" "&PHYL" "&CLSS" "&ORDR" "&FMLY" "&GNUS"
+# accTaxId ----
+# AB042837.1	7904
+
+# completeTaxIds.taxonomy ----
+# 7904 Acipenser transmontanus,Metazoa,Chordata,Actinopteri,Acipenseriformes,Acipenseridae,Acipenser
+
+# Final output ----
+
+# AB042837.1	7904 Acipenser transmontanus,Metazoa,Chordata,Actinopteri,Acipenseriformes,Acipenseridae,Acipenser
 
 ```
+
+## Split taxonomy to sequence data in R
+
+```R
+library(dplyr)
+x <- read.table('accTaxId', header = FALSE)
+y <- read.table('completeTaxIds.taxonomy', header = FALSE, sep=',')
+
+names(x) <- c('acc','taxid')
+names(y) <- c('taxid', 'SPECIE','KING', 'PHYL', 'CLSS', 'ORDR', 'FMLY', 'GNUS')
+
+x %>% inner_join(y) %>% as_tibble() %>% select(acc, taxid, KING, PHYL, CLSS, ORDR, FMLY, GNUS, SPECIE) -> tax
+
+library(Biostrings)
+
+z <- readDNAStringSet('ncbi_complete.fasta.bkp')
+names <- sapply(strsplit(names(z), " "), `[`, 1)
+names(z) <- names
+
+z <- as.data.frame(z[order(names(z))])
+z$acc <- rownames(z)
+
+# processing fasta to save  
+
+tax %>% inner_join(z) %>% as_tibble() -> save
+save$acc <- sub("^", ">", save$acc)
+
+# unite(1:9, col='id', sep = "|")
+
+# save fasta
+wf <- unite(save, 1:9, col='id', sep = "|")
+wf <- c(rbind(wf$id, wf$x))
+write(wf, file=paste0("ncbi_complete.fasta.bkp1"))
+
+# Only sequence
+
+ws <- c(rbind(save$acc, save$x))
+write(ws, file=paste0("ncbi_complete.fasta"))
+
+# Only taxonomy
+wt <- unite(save, 3:9, col='tax', sep = ";") %>% select(acc, tax) %>% as.data.frame()
+wt$acc <- sub("^>", "", wt$acc)
+wt$tax <- sub("$", ";", wt$tax)
+#names(wt) <- NULL
+write.table(wt, file=paste0("ncbi_complete.taxonomy"), sep=" ", 
+            row.names = FALSE, 
+            col.names = FALSE,
+            quote=FALSE)
+
+
+library(data.table)
+taxtb <- data.table(table(tax$ORDR))
+names(taxtb) <- c("rank", "n")
+taxtb <- taxtb[order(-n), ]
+
+taxtb[n <= 100, rank := "Others"]
+
+library(ggpubr)
+
+ggbarplot(taxtb, x = "rank", y = "n",
+#          palette = "Paired",            # jco journal color palett. see ?ggpar
+          x.text.angle = 90,           # Rotate vertically x axis texts
+          ylab = "Number of sequence",
+          xlab = "Orders",
+          rotate = TRUE,
+          ggtheme = theme_minimal()
+          #facet.by = "Type"
+          ) + theme(axis.text.y = element_text(hjust = 1, size = 7))
+
+
+# ggalluvial (time demand) 
+library(ggalluvial)
+alluv <- to_lodes_form(data.frame(tax), key = "Rank", axes = 4:7)
+# alluv <- filter(alluv, Rank == 'ORDR')
+
+ggplot(data = alluv,
+       aes(x = Rank, stratum = stratum, alluvium = alluvium,
+           label = stratum)) +
+  geom_stratum() + 
+  geom_text(stat = "stratum", size = 3) +
+  geom_flow(stat = "alluvium",
+            aes.bind = TRUE, lode.guidance = "rightward") +
+  theme_minimal() 
+#+
+#  ggtitle("The frequency distribution of meroplankton in the GoM.") +
+#  xlab("Level of resolution") + ylab("Number of ASVs")
+
+```
+
+
 
 ### Retrieve Taxon IDs from list of genome accession number
 
@@ -314,7 +418,6 @@ epost -db nuccore -format acc | \
 esummary | \
 xtract -pattern DocumentSummary -element AccessionVersion TaxId \
 > taxId
-
 ```
 
 ```bash
@@ -328,7 +431,6 @@ xtract -pattern Taxon -tab "," -first TaxId ScientificName \
 -block "*/Taxon" -match "Rank:family" -FMLY ScientificName \
 -block "*/Taxon" -match "Rank:genus" -GNUS ScientificName \
 -group Taxon -tab "," -element "&KING" "&PHYL" "&CLSS" "&ORDR" "&FMLY" "&GNUS"; done
-
 ```
 
 
