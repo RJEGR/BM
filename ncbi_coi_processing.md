@@ -14,17 +14,15 @@ Dowload full ncbi COI barcodes data-base using ncbi nucleotide search as Teresit
 - Al filtrar secuencias con abreviaciones redundante en nivel especie: **89,889**
 - Al filtrar secuencias menores o igual a 200 pares de bases: **89,847**
   - Se cuenta con informacion taxonomica para estas secuencias: **VERDADERO**
-- al de-replicar secuencias: **55.248**
+- Al filtrar mitogenomas (secuencias mayores a 2000 pb) : **88,394**
+- al de-replicar secuencias: **54,171**
 
 ## Add API to faster access
 
 ```bash
 NCBI_API_KEY=74e0e4bf2d8eaa3bb742c46316dbafe12909
-
 echo "NCBI_API_KEY=74e0e4bf2d8eaa3bb742c46316dbafe12909" >> $HOME/.bash_profile
 ```
-
-
 
 ## Descarga de secuencias
 
@@ -42,7 +40,6 @@ Taxa were filtered according to the concent of the species field so that only fu
 # 1)
 grep '^>' BARCODE_txid7898_CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta | sed 's/>//g' | awk '{print $2,$3, $4}' | sort | uniq -c | sort -n > frequency.txt
 
- 
 # number of redundant abbreviations: 10361
 
 egrep 'sp\.|cf\.|aff\.|UNVERIFIED|environmental' frequency.txt | awk '{ sum += $1; } END { print sum; }' "$@"
@@ -55,10 +52,10 @@ grep -c "^>" ncbi_complete.fasta # 89889
 
 ```
 
-2.1) seqmagick —min-length 200
+2.1) seqmagick —min-length 200 max length
 
 ```bash
-seqmagick mogrify --min-length 200 ncbi_complete.fasta
+seqmagick mogrify --min-length 200 --max-length 2000 ncbi_complete.fasta
 grep -c "^>" ncbi_complete.fasta # 89847
 
 # Sanity check
@@ -102,8 +99,6 @@ grep 'nr\.' $freq # 0
 Save incomplete
 
 ```bash
-
-
 awk -f linearizefasta.awk < BARCODE_txid7898_CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta | egrep 'sp\.|cf\.|aff\.|UNVERIFIED|environmental' | tr "\t" "\n" > ncbi_incomplete.fasta
 
 grep -c "^>" ncbi_incomplete.fasta # 10384
@@ -126,6 +121,7 @@ END  {printf("\n");}
 
 ```bash
 vsearch -derep_fulllength ncbi_complete.fasta -output ncbi_complete_drep.fasta
+grep -c "^>" ncbi_complete_drep.fasta
 ```
 
 ## Primer design
@@ -329,7 +325,7 @@ x %>% inner_join(y) %>% as_tibble() %>% select(acc, taxid, KING, PHYL, CLSS, ORD
 
 library(Biostrings)
 
-z <- readDNAStringSet('ncbi_complete.fasta.bkp')
+z <- readDNAStringSet('ncbi_complete.fasta')
 names <- sapply(strsplit(names(z), " "), `[`, 1)
 names(z) <- names
 
@@ -346,7 +342,7 @@ save$acc <- sub("^", ">", save$acc)
 # save fasta
 wf <- unite(save, 1:9, col='id', sep = "|")
 wf <- c(rbind(wf$id, wf$x))
-write(wf, file=paste0("ncbi_complete.fasta.bkp1"))
+write(wf, file=paste0("ncbi_complete.fasta.bkp"))
 
 # Only sequence
 
@@ -368,15 +364,15 @@ write.table(wt, file=paste0("ncbi_complete.taxonomy"), sep=" ",
 library(data.table)
 taxtb <- data.table(table(tax$GNUS))
 names(taxtb) <- c("rank", "n")
-taxtb <- taxtb[order(-n), ]
 # cumulative distribution of reads
 par(mfrow=c(1,2))
-
 plot(ecdf(taxtb$n), main = "Cumulative distribution of genus", xlab='Number of sequences')
 sample <- filter(taxtb, n <= 100)
 plot(ecdf(sample$n), main = "Cumulative distribution above the threshold", xlab='Number of sequences')
 #taxtb$n <- taxtb$n / sum(taxtb$n) *100
-
+taxtb <- data.table(table(tax$ORDR))
+names(taxtb) <- c("rank", "n")
+taxtb <- taxtb[order(-n), ]
 taxtb[n <= 100, rank := "Others"]
 
 library(ggpubr)
@@ -444,10 +440,6 @@ xtract -pattern Taxon -tab "," -first TaxId ScientificName \
 ```
 
 ## First intention (Above agoust 2019)
-
-
-
-
 
 - Download Date: July/9/2019
 
