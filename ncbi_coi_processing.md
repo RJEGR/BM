@@ -122,14 +122,10 @@ END  {printf("\n");}
 
 
 
-Files are ready to use
-
-
-
 ## De-replicate sequences
 
 ```bash
-usearch -derep_fulllength peces_bold_no_gaps.fasta -output derep.fa
+vsearch -derep_fulllength ncbi_complete.fasta -output ncbi_complete_drep.fasta
 ```
 
 ## Primer design
@@ -367,11 +363,19 @@ write.table(wt, file=paste0("ncbi_complete.taxonomy"), sep=" ",
             col.names = FALSE,
             quote=FALSE)
 
+# Plot a visualization
 
 library(data.table)
-taxtb <- data.table(table(tax$ORDR))
+taxtb <- data.table(table(tax$GNUS))
 names(taxtb) <- c("rank", "n")
 taxtb <- taxtb[order(-n), ]
+# cumulative distribution of reads
+par(mfrow=c(1,2))
+
+plot(ecdf(taxtb$n), main = "Cumulative distribution of genus", xlab='Number of sequences')
+sample <- filter(taxtb, n <= 100)
+plot(ecdf(sample$n), main = "Cumulative distribution above the threshold", xlab='Number of sequences')
+#taxtb$n <- taxtb$n / sum(taxtb$n) *100
 
 taxtb[n <= 100, rank := "Others"]
 
@@ -439,153 +443,7 @@ xtract -pattern Taxon -tab "," -first TaxId ScientificName \
 -group Taxon -tab "," -element "&KING" "&PHYL" "&CLSS" "&ORDR" "&FMLY" "&GNUS"; done
 ```
 
-
-
-## Construct Folmer marker for BOLD data-base
-
-#### Metaxa2 - conserve mode
-
-...Metaxa2 has so far been strictly limited to operation on the SSU and LSU rRNA genes, preventing its use for other DNA barcodes. Yet, the capability of Metaxa2 to achieve high precision for its classifications while maintaining relatively high sensitivity would be highly desirable also for alternative barcoding markers, … presents an update to Metaxa2 itself, allowing the use of custom databases. We also introduce the Metaxa2 Database Builder (`metaxa2_dbb`)—a software tool that allows users to create customized databases from DNA sequences and their associated taxonomic affiliations.
-
-In the `conserved mode`, on the other hand, the database builder will first extract the barcoding region from the input sequences using models built from a reference sequence provided and the Metaxa2 extractor. It will then align all the extracted sequences using MAFFT
-and determine the conservation of each position in the alignment. When the criteria for degree of conservation are met, all conserved regions are extracted individually and are then re-aligned separately using MAFFT. The re-aligned sequences are used to build hidden Markov models representing the conserved regions with HMMER. In this mode, the classification database will only consist of the extracted full-length sequences
-
-In the `hybrid mode`, finally, the database builder will cluster the input sequences at 20% identity using USEARCH, and then proceed with the conserved mode approach on each cluster separately.
-
-To install a database, first run the command “metaxa2_install_database” without any options. This will produce a list similar to this one:
-
-```bash
-# tuvimos problemas para establecer la conexion a las bases de datos debido a error en curl: error while loading shared libraries: libssl.so.1.0.0:
-
-```
-
-
-
-```bash
-# remove gaps
-awk -f linearizeFasta.awk <  peces_bold.fasta  | awk '{gsub(/[-, .]/, "", $3);print $1"\n"$3}'  > peces_bold_no_gaps.fasta
-
-# get subset and remove gaps
-awk -f linearizeFasta.awk <  peces_bold.fasta | head -n100 | awk '{gsub(/[-, .]/, "", $3); print $1"\n"$3}'  > peces_bold.subset.fasta
-
-# Get taxonomy
-grep '^>' peces_bold.subset.fasta | sed 's/>//g' | column -t > peces_bold.subset.tax
-
-mkdir metaxa2_db
-
-# build metaxa database
-metaxa2_dbb \
-	-m peces_bold.subset.fasta \
-	-t peces_bold.subset.tax \
-	-g COI_bos_taurus.fasta \
-	-d ./metaxa2_db
-	
-	--full_length 658
-	--single_profile
-	--mode conserved
-	-d ./metaxa2_db
-	
-```
-
-### HMMER MODEL
-
-```bash
-#1 set paths
-ln -s /LUSTRE/apps/bioinformatica/hmmer-3.1b2/binaries/makehmmerdb .
-
-# based on bos torus
-./makehmmerdb COI_bos_taurus.fasta COI_bos_taurus
-
-# or in consensus using usearch clustering
-#1)
-usearch -derep_fulllength peces_bold_no_gaps.fasta -sizeout -output derep.fa
-
-# grep -c "^>" derep.fa # 85494 
-usearch -cluster_smallmem derep.fa -id  0.2 -centroids otus.fa -usersort -sortbysize
-usearch -sortbysize otus.fa -minsize 1000 -output otus_minsiz.fa
-
-grep -c "^>" otus.fa # 460
-grep -c "^>" otus_minsiz.fa # 16
-
-./makehmmerdb otus_minsiz.fa otus_minsiz
-```
-
-Las secuencias sentroides encontrados en `otus_minsize.fa` pueden ser usados para construir el modelo de alineamiento de COI como se describe:
-
-Per-alineamiento de centroides al modelo `COI_bos_taurus.fasta`
-
-```bash
-cat otus_minsiz.fa COI_bos_taurus.fasta > mafft.in
-mafft --maxiterate 1000 --globalpair  mafft.in > mafft.align
-
-# HMM construction with hmmbuild
-
-hmmbuild mafft.hmm mafft.align
-
-# HMM calibration with hmmcalibrate
-
-hmmcalibrate mafft.hmm
-
-# Scan
-hmmsearch --tblout hmmsearch.tblout --domtblout hmmsearch.domtblout -A hmmsearch.fasta --acc mafft.hmm peces_bold.subset.fasta &
-
-# con sbatch y srun no corre esta herramienta, averiguar y ejecutar!!!
-
-```
-
-Scan large data-set
-
-```bash
-#!/bin/bash
-#SBATCH --job-name=boldBuild
-#SBATCH -N 2
-#SBATCH --mem=100GB
-#SBATCH --ntasks-per-node=24
-
-#hmm=$1
-#file=$2
-#tag=${file%.}
-
-wrap='hmmscan --cpu 48 --tblout peces_bold_no_gaps.dblout --domtblout peces_bold_no_gaps.domtblout -A peces_bold_no_gaps.fa --acc mafft.hmm peces_bold_no_gaps.fasta'
-
-echo $wrap | sh
-
-exit
-
-hmmsearch --tblout peces_bold_no_gaps.dblout --domtblout peces_bold_no_gaps.domtblout -A peces_bold_no_gaps.hmm.fa --acc mafft.hmm peces_bold_no_gaps.fasta
-
-exit
-
-sbatch -J hmmsearch -e hmmsearch.err -o hmmsearch.out -n 24 -N 2 -t 6-00:00 -mem=100GB \
--wrap="hmmsearch --cpu 48 --tblout peces_bold_no_gaps.dblout --domtblout peces_bold_no_gaps.domtblout -A peces_bold_no_gaps.hmm.fa --acc mafft.hmm peces_bold_no_gaps.fasta"
-
-
-```
-
-
-
-```bash
-#nhmmer [options] <query hmmfile|alignfile> <target seqfile>
-
-nhmmer COI_bos_taurus peces_bold.subset.fasta
-```
-
-## DNA Translation 
-
-use vertebrate-mitocondrial
-
-```bash
-
-
-```
-
-
-
 ## First intention (Above agoust 2019)
-
-
-
->  
 
 
 
