@@ -18,7 +18,7 @@ To install a database, first run the command “metaxa2_install_database” with
 
 ```bash
 # remove gaps
-awk -f linearizeFasta.awk <  peces_bold.fasta  | awk '{gsub(/[-, .]/, "", $3);print $1"\n"$3}'  > peces_bold_no_gaps.fasta
+awk -f linearizeFasta.awk <  peces_bold.fasta  |  '{gsub(/[-, .]/, "", $3);print $1"\n"$3}'  > peces_bold_no_gaps.fasta
 
 # get subset and remove gaps
 awk -f linearizeFasta.awk <  peces_bold.fasta | head -n100 | awk '{gsub(/[-, .]/, "", $3); print $1"\n"$3}'  > peces_bold.subset.fasta
@@ -47,17 +47,17 @@ metaxa2_dbb \
 # Sort by length
 usearch  -sortbylength peces_bold_no_gaps.fasta -output peces_bold_no_gaps_sorted.fasta
 #1) Derep
-usearch -derep_fulllength peces_bold_no_gaps_sorted.fasta -output derep.fa -strand both -sizeout
+usearch -derep_fulllength peces_bold_no_gaps_sorted.fasta -output derep.fa -sizeout #-strand both
 usearch  -sortbylength derep.fa -output derep.sorted.fa
 # Cluster and save centroids
-usearch -cluster_smallmem derep.sorted.fa -id  0.2 -centroids otus.fa -usersort -strand both -sizeout
+usearch -cluster_smallmem derep.sorted.fa -id  0.2 -centroids otus.fa -usersort -sizeout # -strand both 
 
-# usearch -sortbysize otus.fa -minsize 1000 -output otus_minsiz.fa
+# save representative centroides
+usearch -sortbysize otus.fa -minsize 500 -output otus_rep.fa
 
 grep -c "^>" otus.fa # 460
 grep -c "^>" otus_minsiz.fa # 16
 
-./makehmmerdb otus_minsiz.fa otus_minsiz
 ```
 
 Las secuencias centroides encontrados en `otus_minsize.fa` pueden ser usados para construir el modelo de alineamiento de COI como se describe:
@@ -65,12 +65,15 @@ Las secuencias centroides encontrados en `otus_minsize.fa` pueden ser usados par
 Per-alineamiento de centroides al modelo `COI_bos_taurus.fasta`
 
 ```bash
-cat otus_minsiz.fa COI_bos_taurus.fasta > mafft.in
-mafft --maxiterate 1000 --globalpair  mafft.in > mafft.align
+cat otus_rep.fa COI_bos_taurus.fasta > mafft.in
+# mafft --leavegappyregion mafft.in > mafft.out
+
+# High accuracy (for <~200 sequences x <~2,000 aa/nt):
+mafft --maxiterate 1000 --globalpair  mafft.in > mafft.out
 
 # HMM construction with hmmbuild
 
-hmmbuild mafft.hmm mafft.align
+hmmbuild mafft.hmm mafft.out
 
 # HMM calibration with hmmcalibrate
 
