@@ -44,19 +44,15 @@ metaxa2_dbb \
 ### HMMER MODEL
 
 ```bash
-#1 set paths
-ln -s /LUSTRE/apps/bioinformatica/hmmer-3.1b2/binaries/makehmmerdb .
+# Sort by length
+usearch  -sortbylength peces_bold_no_gaps.fasta -output peces_bold_no_gaps_sorted.fasta
+#1) Derep
+usearch -derep_fulllength peces_bold_no_gaps_sorted.fasta -output derep.fa -strand both -sizeout
+usearch  -sortbylength derep.fa -output derep.sorted.fa
+# Cluster and save centroids
+usearch -cluster_smallmem derep.sorted.fa -id  0.2 -centroids otus.fa -usersort -strand both -sizeout
 
-# based on bos torus
-./makehmmerdb COI_bos_taurus.fasta COI_bos_taurus
-
-# or in consensus using usearch clustering
-#1)
-usearch -derep_fulllength peces_bold_no_gaps.fasta -sizeout -output derep.fa
-
-# grep -c "^>" derep.fa # 85494 / 125286
-usearch -cluster_smallmem derep.fa -id  0.2 -centroids otus.fa -usersort
-usearch -sortbysize otus.fa -minsize 1000 -output otus_minsiz.fa
+# usearch -sortbysize otus.fa -minsize 1000 -output otus_minsiz.fa
 
 grep -c "^>" otus.fa # 460
 grep -c "^>" otus_minsiz.fa # 16
