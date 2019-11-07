@@ -1,4 +1,34 @@
-## Construct Folmer marker for BOLD data-base
+## Summary
+
+**Input file **
+
+- **(peces_bold.fasta):** 62544
+
+Preparing model by:
+
+
+
+```bash
+sbatch prep_profile.sh peces_bold.fasta 0.2 100
+
+# Test the classification of the centroids
+sbatch rdp_assign.sh peces_bold_0.2_cntrds_100_ab.fa 70 peces_bold.tax
+
+# add sequence to the centroids and align
+# 1
+cat COI_bos_taurus.fasta peces_bold_0.2_cntrds_100_ab.fa > peces_bold_0.2_cntrds_100_COI_bos_taurus.fa
+# 2
+mafft --maxiterate 1000 --localpair  peces_bold_0.2_cntrds_100_COI_bos_taurus.fa > peces_bold_0.2_cntrds_100_COI_bos_taurus.afa
+
+# Visualize aligment , remove misaligments and use as model to align multiple sequences with mafft or hmm
+
+sbatch mafft.slurm peces_bold.fasta peces_bold_0.2_cntrds_100_COI_bos_taurus_clean.afa
+
+```
+
+
+
+## Construct Folmer marker for BOLD data-base (not used)
 
 #### Metaxa2 - conserve mode
 
@@ -18,10 +48,10 @@ To install a database, first run the command “metaxa2_install_database” with
 
 ```bash
 # remove gaps
-awk -f linearizeFasta.awk <  peces_bold.fasta  |  '{gsub(/[-, .]/, "", $3);print $1"\n"$3}'  > peces_bold_no_gaps.fasta
+awk -f linearizeFasta.awk <  peces_bold.fasta  | awk '{gsub(/[-, .]/, "", $3); print $1"\n"$3}'  > peces_bold_no_gaps.fasta
 
 # get subset and remove gaps
-awk -f linearizeFasta.awk <  peces_bold.fasta | head -n100 | awk '{gsub(/[-, .]/, "", $3); print $1"\n"$3}'  > peces_bold.subset.fasta
+awk -f linearizeFasta.awk <  peces_bold.fasta | head -n1000 | awk '{gsub(/[-, .]/, "", $3); print $1"\n"$3}'  > peces_bold.subset.fasta
 
 # Get taxonomy
 grep '^>' peces_bold.subset.fasta | sed 's/>//g' | column -t > peces_bold.subset.tax
@@ -41,22 +71,300 @@ metaxa2_dbb \
 	
 ```
 
-### HMMER MODEL
+### 1. PREPARING MODEL
 
 ```bash
-# Sort by length
-usearch  -sortbylength peces_bold_no_gaps.fasta -output peces_bold_no_gaps_sorted.fasta
-#1) Derep
-usearch -derep_fulllength peces_bold_no_gaps_sorted.fasta -output derep.fa -sizeout #-strand both
-usearch  -sortbylength derep.fa -output derep.sorted.fa
-# Cluster and save centroids
-usearch -cluster_smallmem derep.sorted.fa -id  0.2 -centroids otus.fa -usersort -sizeout # -strand both 
+#!/bin/bash
+#
+#SBATCH -J pprf
+#SBATCH -p cicese
+#SBATCH -t 6-00:00:00
+#SBATCH -e %N.%j.err
+#SBATCH -o %N.%j.out
+#SBATCH -N 1
+#SBATCH -n 12
+
+# how to:
+# sbacth prep_profile.sh seqs.fa 0.2 2
+
+export PATH=/LUSTRE/apps/bioinformatica/hmmer-3.1b1/bin:$PATH
+
+cd $SLURM_SUBMIT_DIR
+
+rm *.tmp
+
+
+seqs=$1
+id=$2 # from 0 to 0.9, 0.2 (metaxa2 - build_db) or 0.3 (elbretch - primerMinner) recommended
+
+min=$3 # from 1 to n 
+
+usrt=${seqs%.*}_sorted.tmp
+udrp=${usrt%.*}_derep.tmp
+udrp_srt=${udrp%.*}_sorted.tmp
+cntrds=${seqs%.*}_${id}_cntrds.tmp
+acntrds=${cntrds%.*}_${min}_ab.fa
+
+out_folder=tmp_files_${seqs%.*}
+
+# 1. if gaps, remove it with:
+
+#awk -f linearizeFasta.awk < $seqs | awk '{gsub(/[-, .]/, "", $3); print $1"\n"$3}' > ${seqs%.*}_ungapped.tmp
+
+# or
+
+clean_fasta.py -f $seqs
+
+
+seqs=$(ls *_filtered.fasta)
+
+# 2.
+usearch  -sortbylength $seqs -output $usrt
+
+# 3.
+usearch -derep_fulllength $usrt -output $udrp -sizeout
+
+usearch  -sortbylength $udrp -output $udrp_srt
+# 4.
+usearch -cluster_smallmem $udrp_srt -id  $id -centroids $cntrds -usersort -sizeout
 
 # save representative centroides
-usearch -sortbysize otus.fa -minsize 500 -output otus_rep.fa
+usearch -sortbysize $cntrds -minsize $min -output $acntrds
 
-grep -c "^>" otus.fa # 460
-grep -c "^>" otus_minsiz.fa # 16
+# OTUs distribution and size
+grep '^>' $udrp | cut -d"=" -f2 | sed 's/;$//g'| sort | uniq -c | sort -k2,2 -n > derep_distr.txt
+grep '^>' $cntrds | cut -d"=" -f2 | sed 's/;$//g'| sort | uniq -c | sort -k2,2 -n > centroids_distr.txt
+
+# 5.
+# High accuracy (for <~200 sequences x <~2,000 aa/nt):
+mafft --maxiterate 1000 --localpair  $acntrds > ${acntrds%.*}.afa
+
+mkdir -p $out_folder
+mv *.tmp $out_folder
+
+# visually inspect the alignments and remove misalignedsequences and gaps. Then construct profile and run hhmsearch. Ex:
+
+# hmmbuild ${acntrds%.*}.hmm ${acntrds%.*}.afa
+
+# hmmsearch --cpu $SLURM_NPROCS --tblout $tbl --domtblout $domtbl -A $out --acc ${acntrds%.*}.hmm $seqs
+
+exit
+
+```
+
+If add additional sequence use:
+
+```bash
+# Ex
+cat COI_bos_taurus.fasta peces_bold_0.2_cntrds_100_ab.fa > peces_bold_0.2_cntrds_100_COI_bos_taurus.fa
+
+# High accuracy (for <~200 sequences x <~2,000 aa/nt):
+mafft --maxiterate 1000 --localpair  peces_bold_0.2_cntrds_100_COI_bos_taurus.fa > peces_bold_0.2_cntrds_100_COI_bos_taurus.afa
+```
+
+Run the multiple sequences aligment using the model as reference using `hmmsearch`:
+
+```bash
+#!/bin/bash
+#
+#SBATCH -J hmmer
+#SBATCH -p cicese
+#SBATCH -t 6-00:00:00
+#SBATCH -e hmmer.%N.%j.err
+#SBATCH -o hmmer.%N.%j.out
+#SBATCH -N 2
+#SBATCH -n 22
+
+export PATH=/LUSTRE/apps/bioinformatica/hmmer-3.1b1/bin:$PATH
+cd $SLURM_SUBMIT_DIR
+#cd ./HMMER
+
+prfl=$1
+seqs=$2
+tag=${prfl%.*}_vs_${seqs%.*}
+out=${tag}.hmm
+tbl=${tag}.tblout
+domtbl=${tag}.domtblout
+
+hmmsearch --cpu $SLURM_NPROCS --tblout $tbl --domtblout $domtbl -A $out --acc $prfl $seqs
+
+./esl-reformat afa $out > ${out%.*}.align
+```
+
+Or Running the multiple sequence aligment using the model as reference using `mafft`, (reduce inter-genic gaps).
+
+```bash
+#!/bin/bash
+#
+#SBATCH -J mafft
+#SBATCH -p cicese
+#SBATCH -t 6-00:00:00
+#SBATCH -e %N.%j.err
+#SBATCH -o %N.%j.out
+#SBATCH -N 2
+#SBATCH -n 22
+
+ref=$2
+seqs=$1
+tag=${ref%.*}_vs_${seqs%.*}
+out=${tag}.afa
+
+cd $SLURM_SUBMIT_DIR
+
+mafft --anysymbol --thread $SLURM_NPROCS --adjustdirection --keeplength --mapout --add $seqs --reorder $ref > $out
+
+exit
+
+```
+
+check the aligment profile in R before doing the multiple aligment
+
+```R
+# /Users/cigom/metagenomics/db/bos_taurus_align/bos_taurus_folmer/bos_taurus_folmer
+
+rm(list = ls())
+
+.bioc_packages <- c("Biostrings","DECIPHER") # "phangorn"
+
+# Load packages into session, and print package version
+sapply(.bioc_packages, require, character.only = TRUE)
+
+# select the first file with prefix centroids_ab.afa
+file <- dir(pattern="centroids_ab.afa")[1]
+dna <- readDNAStringSet(file, format="fasta")
+
+# dna <- RemoveGaps(dna)
+dna_adj <- AdjustAlignment(dna)
+dna_adj
+
+# test folmer
+folmer <- subseq(dna_adj, start = 23, end = 731)
+folmer <- RemoveGaps(folmer)
+
+table(width(folmer))
+        
+folmer <- folmer[width(folmer) > 400, ]
+
+dba_adj[names(folmer) %in% dna_adj]
+BrowseSeqs(dna_adj)
+BrowseSeqs(folmer)
+```
+
+Run the alignment in R, instead of mafft
+
+```R
+rm(list = ls())
+
+.bioc_packages <- c("Biostrings","DECIPHER") # "phangorn"
+
+# Load packages into session, and print package version
+sapply(.bioc_packages, require, character.only = TRUE)
+
+file <- dir(pattern="centroids_ab.fa")[1]
+dna <- readDNAStringSet(file, format="fasta")
+
+
+
+gT <- lapply(order(width(dna), decreasing=TRUE),
+             function(x) {
+               attr(x, "height") <- 0
+               attr(x, "label") <- names(dna)[x]
+               attr(x, "members") <- 1L
+               attr(x, "leaf") <- TRUE
+               x
+             })
+
+
+attr(gT, "height") <- 0.5
+attr(gT, "members") <- length(dna)
+class(gT) <- "dendrogram"
+# use the guide tree as input for alignment
+
+
+DNA <- AlignTranslation(dna,
+                        guideTree=gT,
+                        iterations=0,
+                        refinements=0)
+
+DNA <- AdjustAlignment(DNA)
+BrowseSeqs(DNA)
+
+writeXStringSet(DNA, filepath = paste0(file, ".tree"), append=FALSE,
+                compress=FALSE, compression_level=NA, format="fasta")
+```
+
+Prepare taxa and fasta from data-input, filter coi_5p marker:
+
+To detect diversity in the taxonomy
+
+```R
+options(stringsAsFactors = FALSE)
+library(tidyverse)
+tbl <- 'bovidae_bold_data.txt'
+tbl <- read.delim(tbl)
+
+# 
+# check outliers ids if FALSE
+length(unique(order(tbl[1]))) == nrow(tbl[1])
+# Does all sequence have markercode? (TRUE)
+sum(table(tbl$markercode)) == nrow(tbl)
+
+# table(tbl$markercode)
+
+marker <- c("COI-5P")
+
+dim(tbl <- tbl[tbl$markercode %in% marker,])
+
+seqs <- tbl$nucleotides
+id <- tbl[1]
+
+linage <- tbl[,c(10,12,14,16,18,20,22)]
+
+# save fasta
+id_ <- sub("^", ">", id$processid)
+ws <- c(rbind(id_, seqs))
+
+write(ws, file=paste0("bovidae.fa"))
+
+# Only taxonomy
+
+wt <- unite(linage, 1:ncol(linage), col='tax', sep = ";")
+wt$tax <- sub("$", ";", wt$tax)
+wt <- cbind(id, wt)
+
+write.table(wt, file=paste0("bovidae.tax"), sep=" ", 
+            row.names = FALSE, 
+            col.names = FALSE,
+            quote=FALSE)
+
+# Plot a visualization
+
+library(data.table)
+taxtb <- data.table(table(linage$genus_name))
+names(taxtb) <- c("rank", "n")
+# cumulative distribution of reads
+par(mfrow=c(1,2))
+plot(ecdf(taxtb$n), main = "Cumulative distribution of genus", xlab='Number of sequences')
+sample <- filter(taxtb, n <= 100)
+plot(ecdf(sample$n), main = "Cumulative distribution above the threshold", xlab='Number of sequences')
+
+#taxtb$n <- taxtb$n / sum(taxtb$n) *100
+
+taxtb <- taxtb[order(-n), ]
+taxtb[n <= 10, rank := "Others"]
+
+library(ggpubr)
+
+ggbarplot(taxtb, x = "rank", y = "n",
+          x.text.angle = 90,
+          ylab = "Number of sequence",
+          xlab = "Genus",
+          rotate = TRUE,
+          ggtheme = theme_minimal()
+          #facet.by = "Type"
+          ) + theme(axis.text.y = element_text(hjust = 1, size = 7))
+
+
 
 ```
 
@@ -71,16 +379,19 @@ cat otus_rep.fa COI_bos_taurus.fasta > mafft.in
 # High accuracy (for <~200 sequences x <~2,000 aa/nt):
 mafft --maxiterate 1000 --globalpair  mafft.in > mafft.out
 
+# clean by hand sequence, then:
 # HMM construction with hmmbuild
 
-hmmbuild mafft.hmm mafft.out
-
+hmmbuild coi_profile.hmm mafft_clean.out
+hmm	
 # HMM calibration with hmmcalibrate
 
-hmmcalibrate mafft.hmm
+hmmcalibrate coi_profile.hmm
 
 # Scan
-hmmsearch --tblout hmmsearch.tblout --domtblout hmmsearch.domtblout -A hmmsearch.fasta --acc mafft.hmm peces_bold.subset.fasta &
+sbatch -J hmmsearch -e hmmsearch.err -o hmmsearch.out -n 24 -N 1 -t 6-00:00 -mem=100GB \
+-wrap="hmmsearch --cpu 24 --tblout tblout.out --domtblout domtblout.out -A peces_bold.subset.hmm --acc coi_profile.hmm peces_bold.subset.fasta" &
+
 
 # con sbatch y srun no corre esta herramienta, averiguar y ejecutar!!!
 
@@ -90,6 +401,12 @@ srun hmmscan --cpu 24 --domtblout TrinotatePFAM.out Pfam-A.hmm good.Trinity.fast
 
 hmmscan --cpu $SLURM_NPROCS --domtblout domtblout.out $pfam $pep
 
+```
+
+And get the aligned sequence from file:
+
+```bash
+./esl-reformat afa coi_profile_vs_peces_bold_no_gaps.hmm > coi_profile_vs_peces_bold_no_gaps.hmm.align
 ```
 
 The most important number here is the first one, the sequence E-value. The E-value is the expected number of false positives (nonhomologous sequences) that scored this well or better. The E-value is a measure of statistical significance. The lower the E-value, the more significant the hit. I typically consider sequences with E-values < 10−3 or so to be significant hits.
@@ -122,17 +439,19 @@ echo $wrap | sh
 
 exit
 
-hmmsearch --tblout peces_bold_no_gaps.dblout --domtblout peces_bold_no_gaps.domtblout -A peces_bold_no_gaps.hmm.fa --acc mafft.hmm peces_bold_no_gaps.fasta
+# test
+hmmsearch --tblout dblout.out --domtblout domtblout.out -A peces_bold.subset.hmm --acc coi_profile.hmm peces_bold.subset.fasta
 
 exit
 
-sbatch -J hmmsearch -e hmmsearch.err -o hmmsearch.out -n 24 -N 2 -t 6-00:00 -mem=100GB \
--wrap="hmmsearch --cpu 48 --tblout peces_bold_no_gaps.dblout --domtblout peces_bold_no_gaps.domtblout -A peces_bold_no_gaps.hmm.fa --acc mafft.hmm peces_bold_no_gaps.fasta"
+sbatch -J hmmsearch -e hmmsearch.err -o hmmsearch.out -n 24 -N 1 -t 6-00:00 -mem=100GB \
+-wrap="hmmsearch --cpu 24 dblout.out --domtblout domtblout.out -A peces_bold.subset.hmm --acc coi_profile.hmm peces_bold.subset.fasta"
+
 
 
 ```
 
-
+asd
 
 ```bash
 #nhmmer [options] <query hmmfile|alignfile> <target seqfile>
