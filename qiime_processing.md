@@ -519,8 +519,13 @@ sbatch Classify-feature.sh X05_rep-seqs_table_1_filtered.qza 0.8 w2pr2_worms_API
 #
 sbatch Classify-feature.sh X06_rep-seqs_table_1_filtered.qza 0.8 w2pr2_worms_API02_no_gaps.fasta.qza w2pr2_worms_API02.tax.qza
 
-
-
-
-
 ```
+
+If merge dataset
+
+```bash
+qiime feature-table merge --i-tables X04_table.qza --i-tables X05_table.qza --i-tables X06_table.qza --o-merged-table merged-table.qza 
+```
+
+
+
