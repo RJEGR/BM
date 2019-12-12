@@ -9,13 +9,22 @@ Dowload full ncbi COI barcodes data-base using ncbi nucleotide search as Teresit
 **La descarga se realizo con fecha Octuber 08, 2019:**
 
 - Downolad method: **e-utilities**
-
 - Al usar el tag "BARCODE" en la busqueda de secuencias despues del 2015: **100,273**
 - Al filtrar secuencias con abreviaciones redundante en nivel especie: **89,889**
 - Al filtrar secuencias menores o igual a 200 pares de bases: **89,847**
   - Se cuenta con informacion taxonomica para estas secuencias: **VERDADERO**
 - Al filtrar mitogenomas (secuencias mayores a 2000 pb) : **88,394**
 - al de-replicar secuencias: **54,171**
+
+**December 6, 2019**
+
+**Clean `Hybrid` abbreviation sequences:**
+
+```bash
+grep 'hybrid' -i BARCODE_txid7898_CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta
+```
+
+
 
 ## Add API to faster access
 
@@ -185,7 +194,7 @@ echo "CPUs totales= $SLURM_NPROCS"
 echo "Los nodos utilizados son: $SLURM_NODELIST"
 
 input=$1
-output=${input%.fasta}.mafft.fasta
+output=${input%.fasta}.mafft.afa
 
 mafft --thread $SLURM_NPROCS $input > $output
 
@@ -555,3 +564,124 @@ exit
 ### Notes
 
 *Even when using GenBank, which is the most redundant sequence repository, the coverage of target species is not satisfactory, as the available reference sequences cover only a fraction of marine zooplankton ([sergio stefanni et. al 2017](https://www.nature.com/articles/s41598-018-30157-7)).*
+
+Clean this page and process in R
+
+```R
+# module load R-3.5
+
+rm(list = ls())
+options(stringsAsFactors = FALSE)
+
+library("Biostrings")
+library("DECIPHER")
+library(tidyr)
+
+rank <- c("Class", "Order", "Family", "Genus", "Species")
+
+fastaF <- 'peces_bold.fasta'
+listF <- 'metafishgom_bold_processid.list'
+
+
+length(db <- readDNAStringSet(fastaF, format="fasta")) # 62,544
+
+nrow(list <- read.table(listF)) # 38, 575
+
+names <- data.frame(name = names(db))
+
+tax <- separate(names, sep = ' ', col = 1, into = c('id', 'Taxonomy'))
+
+names(db) <- tax$id
+
+list[!list[,1] %in% names(db),]
+
+length(db <- db[names(db) %in% list[,1]]) # 38, 567 != nrow(list) ??? R: it correspond to nas: sum(is.na(list[,1]))
+
+dim(tax <- separate(tax, sep = ';', col = 2, into = rank))
+
+dim(tax <- tax[tax$id %in% list[,1],])
+
+identical(tax$id, names(db))
+
+tax <- unite(tax, 'Taxonomy', rank, sep = ';')
+names <- unite(tax, 'names', id:Taxonomy, sep = ' ')
+
+names(db) <- names$names
+
+tag <- sub("_processid.list","",listF)
+
+writeXStringSet(db, filepath = paste0(tag, '.fa'), append=FALSE,
+                compress=FALSE, compression_level=NA, format="fasta")
+
+# 
+rm(list = ls())
+
+options(stringsAsFactors = FALSE)
+
+
+fastaF <- 'ncbi_complete.fasta.bkp'
+listF <- 'metafishgom_ncbi_accnum.list'
+
+
+length(db <- readDNAStringSet(fastaF, format="fasta")) # 88, 394
+
+nrow(list <- read.table(listF)) # 44, 928
+
+names <- data.frame(name = names(db))
+
+tax <- separate(names, sep = '|', col = 1, into = c('id', 'Taxonomy'))
+
+names(db) <- tax$id
+
+list[!list[,1] %in% names(db),]
+
+length(db <- db[names(db) %in% list[,1]]) # 38, 567 != nrow(list) ??? R: it correspond to nas: sum(is.na(list[,1]))
+
+dim(tax <- separate(tax, sep = ';', col = 2, into = rank))
+
+dim(tax <- tax[tax$id %in% list[,1],])
+
+identical(tax$id, names(db))
+
+tax <- unite(tax, 'Taxonomy', rank, sep = ';')
+names <- unite(tax, 'names', id:Taxonomy, sep = ' ')
+
+names(db) <- names$names
+
+tag <- sub("_accnum.list","",listF)
+
+writeXStringSet(db, filepath = paste0(tag, '.fa'), append=FALSE,
+                compress=FALSE, compression_level=NA, format="fasta")
+
+
+```
+
+Check taxonomy
+
+```R
+rm(list = ls())
+options(stringsAsFactors = FALSE)
+
+library(dplyr)
+library(tidyr)
+
+rank <- c("Class", "Order", "Family", "Genus", "Species")
+
+taxF <- 'peces_bold.tax'
+listF <- 'metafishgom_bold_processid.list'
+
+dim(list <- read.table(listF)) # 38575
+dim(tax <- read.table(taxF)) # 62544
+
+match <- list$V1
+    
+dim(t <- tax[tax[,1] %in% match, ]) # 38567 ??
+
+dim(tax <- separate(tax, sep = ';', col = 1, into = rank))
+
+
+
+
+
+
+```

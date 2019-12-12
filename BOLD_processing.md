@@ -1,12 +1,32 @@
 ## Summary
 
-**Input file **
+**<u>Input file</u> **
 
-- **(peces_bold.fasta):** 62544
+- **(peces_bold.fasta):** <u>62,544</u>
+
+**<u>Output file:</u>**
+
+- **(peces_bold_0.2_cntrds_100_COI_bos_taurus_clean_vs_peces_bold.afa):** 62,562 -18  referencias
+- **(mafft_clean_vs_peces_bold.afa):** 62,559 - 15 referencias
+- **(coi_profile_vs_peces_bold_no_gaps.hmm.align):** 62529
+
+# remover el nu
+
+Directories:
+
+**Mafft**
+
+- /LUSTRE/bioinformatica_data/genomica_funcional/MG_COI/PRUEBAS/coi_alignment_fish/mafft
+
+**HMM**
+
+- /LUSTRE/bioinformatica_data/genomica_funcional/MG_COI/PRUEBAS/coi_alignment_fish/HMMER/rep_otu_bos_taurus
+
+**Decipher**
+
+- 
 
 Preparing model by:
-
-
 
 ```bash
 sbatch prep_profile.sh peces_bold.fasta 0.2 100
@@ -26,52 +46,9 @@ sbatch mafft.slurm peces_bold.fasta peces_bold_0.2_cntrds_100_COI_bos_taurus_cle
 
 ```
 
+# 1. Prepering a model
 
-
-## Construct Folmer marker for BOLD data-base (not used)
-
-#### Metaxa2 - conserve mode
-
-...Metaxa2 has so far been strictly limited to operation on the SSU and LSU rRNA genes, preventing its use for other DNA barcodes. Yet, the capability of Metaxa2 to achieve high precision for its classifications while maintaining relatively high sensitivity would be highly desirable also for alternative barcoding markers, … presents an update to Metaxa2 itself, allowing the use of custom databases. We also introduce the Metaxa2 Database Builder (`metaxa2_dbb`)—a software tool that allows users to create customized databases from DNA sequences and their associated taxonomic affiliations.
-
-In the `conserved mode`, on the other hand, the database builder will first extract the barcoding region from the input sequences using models built from a reference sequence provided and the Metaxa2 extractor. It will then align all the extracted sequences using MAFFT and determine the conservation of each position in the alignment. When the criteria for degree of conservation are met, all conserved regions are extracted individually and are then re-aligned separately using MAFFT. The re-aligned sequences are used to build hidden Markov models representing the conserved regions with HMMER. In this mode, the classification database will only consist of the extracted full-length sequences
-
-In the `hybrid mode`, finally, the database builder will cluster the input sequences at 20% identity using USEARCH, and then proceed with the conserved mode approach on each cluster separately.
-
-To install a database, first run the command “metaxa2_install_database” without any options. This will produce a list similar to this one:
-
-```bash
-# tuvimos problemas para establecer la conexion a las bases de datos debido a error en curl: error while loading shared libraries: libssl.so.1.0.0:
-```
-
-
-
-```bash
-# remove gaps
-awk -f linearizeFasta.awk <  peces_bold.fasta  | awk '{gsub(/[-, .]/, "", $3); print $1"\n"$3}'  > peces_bold_no_gaps.fasta
-
-# get subset and remove gaps
-awk -f linearizeFasta.awk <  peces_bold.fasta | head -n1000 | awk '{gsub(/[-, .]/, "", $3); print $1"\n"$3}'  > peces_bold.subset.fasta
-
-# Get taxonomy
-grep '^>' peces_bold.subset.fasta | sed 's/>//g' | column -t > peces_bold.subset.tax
-
-
-# build metaxa database
-metaxa2_dbb \
-	-m peces_bold.subset.fasta \
-	-t peces_bold.subset.tax \
-	-g COI_bos_taurus.fasta \
-	-d ./metaxa2_db
-	
-	--full_length 658
-	--single_profile
-	--mode conserved
-	-d ./metaxa2_db
-	
-```
-
-### 1. PREPARING MODEL
+Copy and paste the follow script in a sbatch of name `prep_profile.sh`
 
 ```bash
 #!/bin/bash
@@ -93,7 +70,6 @@ cd $SLURM_SUBMIT_DIR
 
 rm *.tmp
 
-
 seqs=$1
 id=$2 # from 0 to 0.9, 0.2 (metaxa2 - build_db) or 0.3 (elbretch - primerMinner) recommended
 
@@ -102,7 +78,8 @@ min=$3 # from 1 to n
 usrt=${seqs%.*}_sorted.tmp
 udrp=${usrt%.*}_derep.tmp
 udrp_srt=${udrp%.*}_sorted.tmp
-cntrds=${seqs%.*}_${id}_cntrds.tmp
+#cntrds=${seqs%.*}_${id}_cntrds.tmp
+cntrds=${seqs%.*}_${id}_cnsns.tmp
 acntrds=${cntrds%.*}_${min}_ab.fa
 
 out_folder=tmp_files_${seqs%.*}
@@ -126,7 +103,9 @@ usearch -derep_fulllength $usrt -output $udrp -sizeout
 
 usearch  -sortbylength $udrp -output $udrp_srt
 # 4.
-usearch -cluster_smallmem $udrp_srt -id  $id -centroids $cntrds -usersort -sizeout
+# usearch -cluster_smallmem $udrp_srt -id  $id -centroids $cntrds -usersort -sizeout
+# -consout instead of -centroids
+usearch -cluster_smallmem $udrp_srt -id  $id -consout $cntrds -usersort -sizeout
 
 # save representative centroides
 usearch -sortbysize $cntrds -minsize $min -output $acntrds
@@ -152,7 +131,7 @@ exit
 
 ```
 
-If add additional sequence use:
+b. If add additional sequence use:
 
 ```bash
 # Ex
@@ -162,7 +141,9 @@ cat COI_bos_taurus.fasta peces_bold_0.2_cntrds_100_ab.fa > peces_bold_0.2_cntrds
 mafft --maxiterate 1000 --localpair  peces_bold_0.2_cntrds_100_COI_bos_taurus.fa > peces_bold_0.2_cntrds_100_COI_bos_taurus.afa
 ```
 
-Run the multiple sequences aligment using the model as reference using `hmmsearch`:
+# 2. Multiple sequences aligment using the model as reference
+
+a. Run the multiple sequences aligment using the model as reference using `hmmsearch`:
 
 ```bash
 #!/bin/bash
@@ -191,7 +172,7 @@ hmmsearch --cpu $SLURM_NPROCS --tblout $tbl --domtblout $domtbl -A $out --acc $p
 ./esl-reformat afa $out > ${out%.*}.align
 ```
 
-Or Running the multiple sequence aligment using the model as reference using `mafft`, (reduce inter-genic gaps).
+b. Or Running the multiple sequence aligment using the model as reference using `mafft`, (reduce inter-genic gaps).  Save follow code in a script of name `mafft.slurm`.
 
 ```bash
 #!/bin/bash
@@ -220,37 +201,48 @@ exit
 check the aligment profile in R before doing the multiple aligment
 
 ```R
-# /Users/cigom/metagenomics/db/bos_taurus_align/bos_taurus_folmer/bos_taurus_folmer
-
 rm(list = ls())
 
-.bioc_packages <- c("Biostrings","DECIPHER") # "phangorn"
+# Test the model prepared with userch --> mafft
+
+.bioc_packages <- c("Biostrings", "DECIPHER", "IRanges", "ggplot2")
 
 # Load packages into session, and print package version
 sapply(.bioc_packages, require, character.only = TRUE)
 
-# select the first file with prefix centroids_ab.afa
-file <- dir(pattern="centroids_ab.afa")[1]
-dna <- readDNAStringSet(file, format="fasta")
+dir <- c('/Users/cigom/metagenomics/db/prep_model_ref/')
 
-# dna <- RemoveGaps(dna)
-dna_adj <- AdjustAlignment(dna)
-dna_adj
+prpf <- dir(path = dir, pattern = 'afa', full.names = TRUE)
 
-# test folmer
-folmer <- subseq(dna_adj, start = 23, end = 731)
-folmer <- RemoveGaps(folmer)
+seqs <- readDNAStringSet(prpf, format="fasta")
+BrowseSeqs(seqs)
 
-table(width(folmer))
-        
-folmer <- folmer[width(folmer) > 400, ]
 
-dba_adj[names(folmer) %in% dna_adj]
-BrowseSeqs(dna_adj)
-BrowseSeqs(folmer)
+# remove intergenic gapped sequences
+# DMFH201-16;size=722;
+
+seqs_adj <- AdjustAlignment(seqs)
+
+cleanSeqs <- c('BAST1302-13;size=1620;', 'DMFH201-16;size=722;' )
+
+seqs_adj <- seqs_adj[!names(seqs_adj) %in% cleanSeqs]
+
+BrowseSeqs(seqs_adj)
+
+seqs_adj <- subseq(seqs_adj, 609, width(seqs_adj))
+
+
+outtag <- sub(".afa","",prpf[2])
+
+writeXStringSet(seqs_adj, filepath = paste0(outtag, '_clean.afa'), append=FALSE,
+                compress=FALSE, compression_level=NA, format="fasta")
+
+# mandamos el alineamiento de secuencias 
+
+
 ```
 
-Run the alignment in R, instead of mafft
+Run the alignment of the model in R, **instead of mafft**
 
 ```R
 rm(list = ls())
@@ -260,10 +252,13 @@ rm(list = ls())
 # Load packages into session, and print package version
 sapply(.bioc_packages, require, character.only = TRUE)
 
-file <- dir(pattern="centroids_ab.fa")[1]
+# file <- dir(pattern="centroids_ab.fa")[1]
+file <- dir(pattern="peces_bold_0.2_cnsns_100_COI_bos_taurus.fa")
+
 dna <- readDNAStringSet(file, format="fasta")
 
-
+# name "Vertebrate Mitochondrial" ,
+SGC1 <- getGeneticCode("SGC1")
 
 gT <- lapply(order(width(dna), decreasing=TRUE),
              function(x) {
@@ -284,13 +279,128 @@ class(gT) <- "dendrogram"
 DNA <- AlignTranslation(dna,
                         guideTree=gT,
                         iterations=0,
-                        refinements=0)
+                        refinements=0,
+                        geneticCode = SGC1)
 
 DNA <- AdjustAlignment(DNA)
 BrowseSeqs(DNA)
+# 
 
-writeXStringSet(DNA, filepath = paste0(file, ".tree"), append=FALSE,
+cleanSeqs <- c('centroid=BAST1302-13;seqs=1620;size=1620;')
+
+DNA <- DNA[!names(DNA) %in% cleanSeqs]
+
+writeXStringSet(DNA, filepath = paste0(file, ".decipher.afa"), append=FALSE,
                 compress=FALSE, compression_level=NA, format="fasta")
+
+
+# CHECK CODON
+
+aa <- translate(dna, genetic.code = SGC1)
+
+BrowseSeqs(aa)
+
+start <- subseq(aa, 1,1)
+
+we <- width(aa)
+
+ws <- we -5 
+
+end <- subseq(aa, we, we)
+
+
+```
+
+Check the centroids classification vs the sequence classification
+
+```bash
+options(stringsAsFactors = FALSE)
+
+library(tidyverse)
+
+url <- 'https://raw.githubusercontent.com/RJEGR/metagenomics/master/readtx.R'
+source(url)
+
+centroid.file <- 'peces_bold_0.2_cntrds_100_ab_70_rdp.peces_bold_outdir/peces_bold_0.2_cntrds_100_ab.peces_bold.wang.taxonomy'
+
+#centroid.file <- 'peces_bold_0.2_cnsns_100_COI_bos_taurus_70_rdp.peces_bold_outdir/peces_bold_0.2_cnsns_100_COI_bos_taurus.peces_bold.wang.tax.summary'
+
+fish.file <- 'peces_bold.tax'
+
+dim(centroid <- read_rdp(centroid.file))
+dim(fish_bold <- read.delim(fish.file, row.names = 1, sep = ';', header = FALSE)) # 62544
+
+
+# table(centroid[,2])
+# table(fish_bold[,1])
+
+length(rep_names <- names(table(centroid[,4]))) # 19
+length(names <- names(table(fish_bold[,3]))) # 2712
+
+dim(rep_fish_bold <- fish_bold[fish_bold[,3] %in% rep_names ,]) # 2807
+dim(norep_fish_bold <- fish_bold[!fish_bold[,3] %in% rep_names,]) # 59737
+
+# sanity check
+identical(names(table(rep_fish_bold[,3])), rep_names) # TRUE
+nrow(rep_fish_bold) + nrow(norep_fish_bold) == nrow(fish_bold) # TRUE
+
+# 2807 lecturas subsisten la clasificacion de generos de los centroides
+
+# 
+
+library(data.table)
+
+x <- data.table(z = 'Yes', table(rep_fish_bold[,3]))
+y <- data.table(z = 'Not', table(fish_bold[,3]))
+
+res <- rbind(x,y)
+res <- res[order(N)]
+
+# sanity check
+length(rep_names) + length(names) == nrow(res) # TRUE
+
+# TEST
+# cumulative distribution of reads
+par(mfrow=c(1,2))
+plot(ecdf(res$N), main = "Cumulative distribution of genus", xlab='Number of sequences')
+
+sample <- filter(res, N <= 500)
+
+plot(ecdf(sample$N), main = "Cumulative distribution above the threshold", xlab='Number of sequences')
+
+# make pct of abundance
+
+pct <- function(x) {x / sum(x) * 100}
+
+res[, pct := (pct(N))]
+
+sum(res$pct) # 100
+
+aggregate(res[,'pct'], by=list(res$z), sum)
+# group data in fractions
+res[(N == 1), group := "A"]
+res[(N >= 2 & N <= 99), group := "B"]
+res[(N >= 100 & N <= 499), group := "C"]
+res[(N >= 500), group := "D"]
+
+table(res$group)
+length(table(res$group))
+
+# 
+
+library(ggalluvial)
+
+ggplot(data = res,
+       aes(axis1 = z, axis2 = group,
+           y = pct)) +
+  scale_x_discrete(limits = c("Centroid", "Group"), expand = c(.1, .05)) +
+  geom_alluvium(aes(fill = z)) +
+  geom_stratum() + geom_text(stat = "stratum", label.strata = TRUE) +
+  theme_minimal(base_size=16) +
+  labs(title = "", x = "Flow of data" , y = "Reads (%)")
+  
+  
+quit(save = 'no')
 ```
 
 Prepare taxa and fasta from data-input, filter coi_5p marker:
@@ -373,25 +483,6 @@ Las secuencias centroides encontrados en `otus_minsize.fa` pueden ser usados par
 Per-alineamiento de centroides al modelo `COI_bos_taurus.fasta`
 
 ```bash
-cat otus_rep.fa COI_bos_taurus.fasta > mafft.in
-# mafft --leavegappyregion mafft.in > mafft.out
-
-# High accuracy (for <~200 sequences x <~2,000 aa/nt):
-mafft --maxiterate 1000 --globalpair  mafft.in > mafft.out
-
-# clean by hand sequence, then:
-# HMM construction with hmmbuild
-
-hmmbuild coi_profile.hmm mafft_clean.out
-hmm	
-# HMM calibration with hmmcalibrate
-
-hmmcalibrate coi_profile.hmm
-
-# Scan
-sbatch -J hmmsearch -e hmmsearch.err -o hmmsearch.out -n 24 -N 1 -t 6-00:00 -mem=100GB \
--wrap="hmmsearch --cpu 24 --tblout tblout.out --domtblout domtblout.out -A peces_bold.subset.hmm --acc coi_profile.hmm peces_bold.subset.fasta" &
-
 
 # con sbatch y srun no corre esta herramienta, averiguar y ejecutar!!!
 
@@ -468,6 +559,49 @@ use vertebrate-mitocondrial
 ```
 
 
+
+## Construct Folmer marker for BOLD data-base (not used)
+
+#### Metaxa2 - conserve mode
+
+...Metaxa2 has so far been strictly limited to operation on the SSU and LSU rRNA genes, preventing its use for other DNA barcodes. Yet, the capability of Metaxa2 to achieve high precision for its classifications while maintaining relatively high sensitivity would be highly desirable also for alternative barcoding markers, … presents an update to Metaxa2 itself, allowing the use of custom databases. We also introduce the Metaxa2 Database Builder (`metaxa2_dbb`)—a software tool that allows users to create customized databases from DNA sequences and their associated taxonomic affiliations.
+
+In the `conserved mode`, on the other hand, the database builder will first extract the barcoding region from the input sequences using models built from a reference sequence provided and the Metaxa2 extractor. It will then align all the extracted sequences using MAFFT and determine the conservation of each position in the alignment. When the criteria for degree of conservation are met, all conserved regions are extracted individually and are then re-aligned separately using MAFFT. The re-aligned sequences are used to build hidden Markov models representing the conserved regions with HMMER. In this mode, the classification database will only consist of the extracted full-length sequences
+
+In the `hybrid mode`, finally, the database builder will cluster the input sequences at 20% identity using USEARCH, and then proceed with the conserved mode approach on each cluster separately.
+
+To install a database, first run the command “metaxa2_install_database” without any options. This will produce a list similar to this one:
+
+```bash
+# tuvimos problemas para establecer la conexion a las bases de datos debido a error en curl: error while loading shared libraries: libssl.so.1.0.0:
+```
+
+
+
+```bash
+# remove gaps
+awk -f linearizeFasta.awk <  peces_bold.fasta  | awk '{gsub(/[-, .]/, "", $3); print $1"\n"$3}'  > peces_bold_no_gaps.fasta
+
+# get subset and remove gaps
+awk -f linearizeFasta.awk <  peces_bold.fasta | head -n1000 | awk '{gsub(/[-, .]/, "", $3); print $1"\n"$3}'  > peces_bold.subset.fasta
+
+# Get taxonomy
+grep '^>' peces_bold.subset.fasta | sed 's/>//g' | column -t > peces_bold.subset.tax
+
+
+# build metaxa database
+metaxa2_dbb \
+	-m peces_bold.subset.fasta \
+	-t peces_bold.subset.tax \
+	-g COI_bos_taurus.fasta \
+	-d ./metaxa2_db
+	
+	--full_length 658
+	--single_profile
+	--mode conserved
+	-d ./metaxa2_db
+	
+```
 
 ## BOLD Processing data base to rdp - mothur format
 
@@ -709,3 +843,14 @@ $mothur "#system(mkdir -p $outdir);set.dir(output=$outdir, tempdefault=$DB);summ
 exit
 ```
 
+
+
+test mothur single end
+
+```bash
+merge.files(input=cigom.files, output=cigom.fasta)
+
+fastq.info(file=cigom.file)
+fastq.info(fastq=016-X07-A3-18S-AMB_S1_L001_R1_001.fastq.gz)
+
+```
