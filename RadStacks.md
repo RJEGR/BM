@@ -73,10 +73,10 @@ export PATH=/LUSTRE/apps/bioinformatica/stacks-2.5/bin/:$PATH
 
 module load gcc-7.2
 
-fasta=$1 # UO_C716_1.fastq.gz
-bars=$2 # barcode_C716_AM.txt
+fasta=$1 # Ex. UO_C716_1.fastq.gz
+bars=$2 # Ex. barcode_C716_AM.txt
 
-outdir=$3
+outdir=$3 # Ex. my_out_folder
 
 mkdir $outdir
 
