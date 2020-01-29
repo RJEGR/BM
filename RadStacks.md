@@ -14,10 +14,14 @@ module load gcc-7.2
 
 
 
-  14 AM = A Amarillo
-     16 AN = A Negro (cultivo)
-     45 AR = A Rojo
-     20 AZ = A azul
+| N    | A.             |
+| ---- | -------------- |
+| 14   | Amarillo       |
+| 16   | Rojo (Cultivo) |
+| 20   | Azul           |
+| 16   | Negro          |
+|      |                |
+|      |                |
 
 ```bash
 #!/bin/bash
@@ -72,7 +76,7 @@ module load gcc-7.2
 fasta=$1 # UO_C716_1.fastq.gz
 bars=$2 # barcode_C716_AM.txt
 
-outdir=${fasta%.txt}_rtgs
+outdir=$3
 
 mkdir $outdir
 
@@ -82,7 +86,7 @@ exit
 
 ```
 
-`sbatch process_radtags.sh raw/UO_C716_1.fastq.gz barcodes/barcode_C716_AM.txt`
+`sbatch process_radtags.sh raw/UO_C716_1.fastq.gz barcodes/barcode_C716_AM.txt my_out_folder`
 
 
 
