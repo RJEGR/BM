@@ -1,10 +1,10 @@
-# Análisis de datos de secuenciación masiva de pequeños RNAs no-codificantes
+# Stacks: Construyendo loci a partir de secuencias de lectura corta
 
-> 28 de Enero en CICESE
+> 29-30 de Enero, 2020 en CICESE
 >
 > Ponente: Dr. Cristián Araneda, Laboratorio de Genética y Biotecnología en Acuicultura, Universidad de Chile
 
-## Ingresando al cluster
+## 1. Ingresando al cluster
 
 Ingresar con tus credenciales:
 
@@ -12,11 +12,15 @@ Ejemplo:
 
 `ssh usuario@omica`
 
+`Password:******`
+
 Y vallamos a nuestro directorio de trabajo:
 
 `cd /LUSTRE/bioinformatica_data/genomica_funcional/RAD2020`
 
-## Para Stacks
+**Aviso de privacidad: Ningun dato presente en este documento compromete resultados de investigacion privados**
+
+## 1. Procesando Radtags
 
 Estamos muy emocionados por nuestros datos de genomica poblacional. Sin embargo nos encontramos con el reto de que nuestros analisis bioinformaticos demoran mas de lo esperado, para ello usaremos un servidor de computo (Clusters) que tiene la capacidad de hacer analisis complejos en un menor tiempo. 
 
@@ -24,13 +28,14 @@ Estamos muy emocionados por nuestros datos de genomica poblacional. Sin embargo 
 
 Creamos un script con las directrireces necesarias ejecutar nuestros comandos atraves del administrador de tareas. Este script lo guardamos en un archivo de texto plano llamado `process_radtags.sh` y ejecutamos nuestra tarea (`sbatch`) como a continuación:
 
-`sbatch process_radtags.sh raw/UO_C716_1.fastq.gz barcodes/barcode_C716_AM.txt my_out_folder`
+`sbatch process_radtags.sh raw/UO_C716_1.fastq.gz barcodes/barcode_C716_AM.txt my_out_folder 100` 
 
 El script `process_radtags.sh` va a solicitar tres variables de entrada:
 
 1. Archivo fasta (Ej.`raw/UO_C716_1.fastq.gz`)
 2. Lista de barcodes (Ej. `barcodes/barcode_C716_AM.txt`)
 3. nombre de archivo de salida (Ej. `my_out_folder`)
+4. Truncate final read length to this value (Ej. `75-100`)
 
 No sera necesario sobre-escribir dentro del script las variables mencioadas debido a que estas seran remplazadas por lo que se describe dentro de la sintaxis del sbatch.
 
@@ -57,15 +62,15 @@ bars=$2 # Ex. barcode_C716_AM.txt
 
 outdir=$3 # Ex. my_out_folder
 
-mkdir $outdir
+len=$4
 
-process_radtags -f $fasta -b $bars -o $outdir -e 'sbfI' -c -q -r -t 75
+mkdir -p $outdir
+
+process_radtags -f $fasta -b $bars -o $outdir -e 'sbfI' -c -q -r -t $len
 
 exit
 
 ```
-
-
 
 ### Otras notas
 
@@ -104,15 +109,6 @@ module load gcc-7.2
 ```
 
 
-
-| N    | A.             |
-| ---- | -------------- |
-| 14   | Amarillo       |
-| 16   | Rojo (Cultivo) |
-| 20   | Azul           |
-| 16   | Negro          |
-|      |                |
-|      |                |
 
 ```bash
 #!/bin/bash
