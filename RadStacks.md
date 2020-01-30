@@ -81,7 +81,7 @@ exit
 
 ## 2. Ustacks (Construccion de SNPs)
 
-Vamos a variar el minimo de covertura (m), maximo de distancia entre stacks (M) y  maximo de distancia (N)  para evaluar el procesamiento de stacks generados. 
+Vamos a variar el minimo de covertura (m), maximo de distancia entre stacks (M) y  maximo de distancia (N)  para evaluar el procesamiento de stacks que se generen hasta que encontremos nuestros parametros de _equilibrio_. 
 
 | 8    | ..   | 1    | M    | # Staks |
 | ---- | ---- | ---- | ---- | ------- |
@@ -97,16 +97,9 @@ do
 	echo ${m}M${M}N${N}n${n}_snp
 done
 
-awk '{SUM+=$3}END{print SUM}'
+# short-cuts
+for i in *gz; do zcat $i | head -n10000000 > ../${i%.fq.gz}_gore.fq; done
 
-
-for i in *.cnv
-do
-   S=$(grep Station $i | sed 's/** Station://'g)
-   C=$(grep Cruise $i | sed 's/** Cruise://g')
-   echo 'labeling' $i 'by' $C 'with' $S
-   cp $i ${i%.cnv}_${C}_${S}.tmp
-done
 ```
 
 
