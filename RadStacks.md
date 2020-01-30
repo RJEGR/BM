@@ -20,9 +20,7 @@ Vamos a cargar los programas que usaremos. Versión 2.5 de stacks que se encuent
 
 ```bash
 export PATH=/LUSTRE/apps/bioinformatica/stacks-2.5/bin/:$PATH
-
 module load gcc-7.2
-
 ```
 
 Para dejar de manera permanente el programa alojado en nuestras variables de ambiente usemos el siguiente comando. **De esta manera no sera necesario exportar la ruta del programa cada vez que iniciemos sesion dentro del cluster:**
@@ -54,8 +52,8 @@ No sera necesario sobre-escribir dentro del script las variables mencioadas debi
 #!/bin/bash
 #SBATCH -p cicese
 #SBATCH --job-name=rtgs 
-#SBATCH --output=trm-%j.log 
-#SBATCH --error=trm-%j.err 
+#SBATCH --output=rtgs-%j.log 
+#SBATCH --error=rtgs-%j.err 
 #SBATCH -N 1
 #SBATCH --mem=100GB
 #SBATCH --ntasks-per-node=24 
@@ -65,9 +63,7 @@ No sera necesario sobre-escribir dentro del script las variables mencioadas debi
 export PATH=/LUSTRE/apps/bioinformatica/stacks-2.5/bin/:$PATH
 
 module load gcc-7.2
-
 which process_radtags
-
 
 fasta=$1 # Ex. UO_C716_1.fastq.gz
 bars=$2 # Ex. barcode_C716_AM.txt
@@ -81,55 +77,85 @@ mkdir -p $outdir
 process_radtags -f $fasta -b $bars -o $outdir -e 'sbfI' -c -q -r -t $len
 
 exit
-
 ```
 
-## 2. Ustacks
+## 2. Ustacks (Construccion de SNPs)
 
-texto
+Vamos a variar el minimo de covertura (m), maximo de distancia entre stacks (M) y  maximo de distancia (N)  para evaluar el procesamiento de stacks generados. 
+
+| 8    | ..   | 1    | M    | # Staks |
+| ---- | ---- | ---- | ---- | ------- |
+| 10   | ..   | 5    | N    | # Staks |
+| 7    | ..   | 2    | m    | # Staks |
+
+`/LUSTRE/bioinformatica_data/genomica_funcional/RAD2020/samples_an/AN_9.fq.gz`
+
+```bash
+for m in $(seq 3 8); 
+do
+	M=$(awk '{SUM+=$m}END{print SUM}')
+	echo ${m}M${M}N${N}n${n}_snp
+done
+
+awk '{SUM+=$3}END{print SUM}'
+
+
+for i in *.cnv
+do
+   S=$(grep Station $i | sed 's/** Station://'g)
+   C=$(grep Cruise $i | sed 's/** Cruise://g')
+   echo 'labeling' $i 'by' $C 'with' $S
+   cp $i ${i%.cnv}_${C}_${S}.tmp
+done
+```
+
+
+
+Creamos un script con las directrireces necesarias ejecutar nuestros comandos atraves del administrador de tareas. Este script lo guardamos en un archivo de texto plano llamado `ustacks.sh` y ejecutamos nuestra tarea (`sbatch`) como a continuación:
+
+`sbatch ustacks.sh /path/to/file.fq.gz 9 7 2 4` 
 
 ```bash
 #!/bin/bash
 #SBATCH -p cicese
 #SBATCH --job-name=ustks
-#SBATCH --output=ustks-%j.log 
-#SBATCH --error=ustks-%j.err 
 #SBATCH -N 2
 #SBATCH --mem=100GB
 #SBATCH --ntasks-per-node=20
+
+# How to:
+# sbatch ustacks.sh /path/to/file.fq.gz 9 7 2 4
 
 export PATH=/LUSTRE/apps/bioinformatica/stacks-2.5/bin/:$PATH
 
 module load gcc-7.2
 
-which process_radtags
+which ustacks
 
-fasta=/LUSTRE/bioinformatica_data/genomica_funcional/RAD2020/fastqc/samples_AM/AN_9.fq.gz \
-
-# -M — Maximum distance (in nucleotides) allowed between stacks (default 2).
+# i : a unique integer ID for this sample.
 # -m — Minimum depth of coverage required to create a stack (default 3).
+# -M — Maximum distance (in nucleotides) allowed between stacks (default 2).
 # -N — Maximum distance allowed to align secondary reads to primary stacks (default: M + 2).
-# -H — disable calling haplotypes from secondary reads.
 # --alpha [num] — chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05 (default), 0.01, or 0.001 
+# d --deleverage: enable the Deleveraging algorithm, used for resolving over merged tags.
+# --model_type 'snp' (default)
 
-m7M2N4
-ustacks -t gzfastq \
-				-f $fasta \
-				-o 
-				-i l \
-        -m 7 \
-        -M 2 \
-        -N 4 \
-        -H -p $SLURM_NPROCS
-				-model_type 'snp' \
-				--alpha 0.05
-				
-				
+fst=$1
+i=$2
+m=$3 # Ej. 7
+M=$4 # Ej. 2
+N=$5 # Ej. 4
 
+mkdir -p $PWD/m${m}M${M}N${N}n${n}_snp
 
+ustacks -t gzfastq -f $fst  -o $PWD/m${m}M${M}N${N}n${n}_snp -i $i -m $m -M $M -N $N --alpha 0.05 -d -H -p $SLURM_NPROCS
+
+exit
 ```
 
+## 3. Construccion de catalogo
 
+Hacemos el catalogo _a mano_ y nos pasamos a `stacks`. Esta parte es laboriosa. 
 
 
 
@@ -182,7 +208,7 @@ fastqc $fasta -t $SLURM_NPROCS --nogroup -o $outdir
 mkdir multiqc
 export PATH=/LUSTRE/apps/Anaconda/conda2/bin:$PATH
 source activate multiqc_py2.7
-multiqc ./fastqc/*zip -o ./multiqc --data-format json --export
+multiqc ./*_fastqc/*zip -o ./multiqc --data-format json --export
 ```
 
 
