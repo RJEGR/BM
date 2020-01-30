@@ -24,7 +24,7 @@ El script `process_radtags.sh` va a solicitar tres variables de entrada:
 2. Lista de barcodes (Ej. `barcodes/barcode_C716_AM.txt`)
 3. nombre de archivo de salida (Ej. `my_out_folder`)
 
-
+No sera necesario sobre-escribir dentro del script las variables mencioadas debido a que estas seran remplazadas por lo que se describe dentro de la sintaxis del sbatch.
 
 ```bash
 #!/bin/bash
