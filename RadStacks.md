@@ -1,3 +1,11 @@
+# Análisis de datos de secuenciación masiva de pequeños RNAs no-codificantes
+
+> 28 de Enero en CICESE
+>
+> Ponente: Dr. Cristián Araneda, Laboratorio de Genética y Biotecnología en Acuicultura, Universidad de Chile
+
+## Ingresando al cluster
+
 Ingresar con tus credenciales:
 
 Ejemplo:
