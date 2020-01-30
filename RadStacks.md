@@ -4,11 +4,9 @@
 >
 > Ponente: Dr. Cristián Araneda, Laboratorio de Genética y Biotecnología en Acuicultura, Universidad de Chile
 
-## 1. Ingresando al cluster
+## Para empezar
 
 Ingresar con tus credenciales:
-
-Ejemplo:
 
 `ssh usuario@omica`
 
@@ -18,7 +16,20 @@ Y vallamos a nuestro directorio de trabajo:
 
 `cd /LUSTRE/bioinformatica_data/genomica_funcional/RAD2020`
 
-**Aviso de privacidad: Ningun dato presente en este documento compromete resultados de investigacion privados**
+Vamos a cargar los programas que usaremos. Versión 2.5 de stacks que se encuentra en la trayectoria:
+
+```bash
+export PATH=/LUSTRE/apps/bioinformatica/stacks-2.5/bin/:$PATH
+
+module load gcc-7.2
+
+```
+
+Para dejar de manera permanente el programa alojado en nuestras variables de ambiente usemos el siguiente comando. **De esta manera no sera necesario exportar la ruta del programa cada vez que iniciemos sesion dentro del cluster:**
+
+`echo 'export PATH=/LUSTRE/apps/bioinformatica/stacks-2.5/bin/:$PATH' >> ~/.bash_profile`
+
+**Aviso de privacidad: Ningún dato presente en este documento compromete resultados de investigación privados**
 
 ## 1. Procesando Radtags
 
@@ -51,11 +62,12 @@ No sera necesario sobre-escribir dentro del script las variables mencioadas debi
 #SBATCH -t 06-00:00:00 
 #SBATCH --exclusive
 
-which process_radtags
-
 export PATH=/LUSTRE/apps/bioinformatica/stacks-2.5/bin/:$PATH
 
 module load gcc-7.2
+
+which process_radtags
+
 
 fasta=$1 # Ex. UO_C716_1.fastq.gz
 bars=$2 # Ex. barcode_C716_AM.txt
@@ -71,6 +83,55 @@ process_radtags -f $fasta -b $bars -o $outdir -e 'sbfI' -c -q -r -t $len
 exit
 
 ```
+
+## 2. Ustacks
+
+texto
+
+```bash
+#!/bin/bash
+#SBATCH -p cicese
+#SBATCH --job-name=ustks
+#SBATCH --output=ustks-%j.log 
+#SBATCH --error=ustks-%j.err 
+#SBATCH -N 2
+#SBATCH --mem=100GB
+#SBATCH --ntasks-per-node=20
+
+export PATH=/LUSTRE/apps/bioinformatica/stacks-2.5/bin/:$PATH
+
+module load gcc-7.2
+
+which process_radtags
+
+fasta=/LUSTRE/bioinformatica_data/genomica_funcional/RAD2020/fastqc/samples_AM/AN_9.fq.gz \
+
+# -M — Maximum distance (in nucleotides) allowed between stacks (default 2).
+# -m — Minimum depth of coverage required to create a stack (default 3).
+# -N — Maximum distance allowed to align secondary reads to primary stacks (default: M + 2).
+# -H — disable calling haplotypes from secondary reads.
+# --alpha [num] — chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05 (default), 0.01, or 0.001 
+
+m7M2N4
+ustacks -t gzfastq \
+				-f $fasta \
+				-o 
+				-i l \
+        -m 7 \
+        -M 2 \
+        -N 4 \
+        -H -p $SLURM_NPROCS
+				-model_type 'snp' \
+				--alpha 0.05
+				
+				
+
+
+```
+
+
+
+
 
 ### Otras notas
 
@@ -92,20 +153,6 @@ tar -zxvf FLafarga_CICESE_Abalone_20161108−01479.tar.gz raw
 exit
 
 # tar -zxvf config.tar.gz etc/default/sysstat
-```
-
-
-
-En esta ocasión el proceso de instalación no presentó ninguna complicación, ya quedó la versión 2.5 de stacks, se encuentra en la trayectoria:
-
-```bash
-# path
-# which process_radtags
-# ls /LUSTRE/apps/bioinformatica/stacks-2.5/bin 
-
-export PATH=/LUSTRE/apps/bioinformatica/stacks-2.5/bin/:$PATH
-
-module load gcc-7.2
 ```
 
 
