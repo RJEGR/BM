@@ -79,30 +79,16 @@ process_radtags -f $fasta -b $bars -o $outdir -e 'sbfI' -c -q -r -t $len
 exit
 ```
 
+
+
 ## 2. Ustacks (Construccion de SNPs)
 
-Vamos a variar el minimo de covertura (m), maximo de distancia entre stacks (M) y  maximo de distancia (N)  para evaluar el procesamiento de stacks que se generen hasta que encontremos nuestros parametros de _equilibrio_. 
+1. **Algunas pruebas previas**: vamos a variar el minimo de covertura (m), maximo de distancia entre stacks (M) y  maximo de distancia (N)  para evaluar el procesamiento de stacks que se generen hasta que encontremos nuestros parametros de _equilibrio_ que mas se acerque a la columna de distribución normal entre los valores de las pruebas. Vamos a usar aquella muestra cuyo numero de lecturas representen al promedio de las lecturas de todas las muestras procesadas con `process_radtags`. 1) Vamos a evaluar el parametro M hasta tomar el valor normal 2) Variamos los valores n/M.  Aqui tenemos que ser cuidadonos porque nuestro numero de stacks esperados tiene que ser consistente con las medidas realizadas previamente con los calculos de contenido GC genomico y corte enzimatico (Por ejemplo usando la herramienta `simRAD` en R).
 
 | 8    | ..   | 1    | M    | # Staks |
 | ---- | ---- | ---- | ---- | ------- |
 | 10   | ..   | 5    | N    | # Staks |
 | 7    | ..   | 2    | m    | # Staks |
-
-`/LUSTRE/bioinformatica_data/genomica_funcional/RAD2020/samples_an/AN_9.fq.gz`
-
-```bash
-for m in $(seq 3 8); 
-do
-	M=$(awk '{SUM+=$m}END{print SUM}')
-	echo ${m}M${M}N${N}n${n}_snp
-done
-
-# short-cuts
-for i in *gz; do zcat $i | head -n10000000 > ../${i%.fq.gz}_gore.fq; done
-
-```
-
-
 
 Creamos un script con las directrireces necesarias ejecutar nuestros comandos atraves del administrador de tareas. Este script lo guardamos en un archivo de texto plano llamado `ustacks.sh` y ejecutamos nuestra tarea (`sbatch`) como a continuación:
 
@@ -146,9 +132,81 @@ ustacks -t gzfastq -f $fst  -o $PWD/m${m}M${M}N${N}n${n}_snp -i $i -m $m -M $M -
 exit
 ```
 
+Para esta prueba usaremos una muestra representativa: `/LUSTRE/bioinformatica_data/genomica_funcional/RAD2020/samples_an/AN_9.fq.gz`
+
+Para nuestro datos, notamos que 6 fue el valor normal para m y 4,6 los valores esperados para M y N. Posteriormente corremos usando estos parametros estándares el modulo ustacks para el resto de nuestros datos:
+
+2. Estandarizar y ejecutar recursivamente a todos las bibliotecas
+
+Vamos a re-muestrear cada biblioteca *para asegurar la misma contribución de variacion en la secuencia de todas las muestras*. Esto nos dara la misma profundidad en numero de lecturas para todas nuestras muestras antes de procesar nuestros `stacks`
+
+```bash
+#!/bin/bash
+#SBATCH -p cicese
+#SBATCH --job-name=ustks
+#SBATCH -N 1
+#SBATCH --mem=100GB
+#SBATCH --ntasks-per-node=24 
+#SBATCH -t 06-00:00:00 
+
+# Re-sampling
+for i in *gz; do zcat $i | head -n10000000 > ${i%.fq.gz}.fq; done
+
+ls *.fq > std_samples
+
+```
+
+Y finalmente ejecutamos `stacks` en todas las muestras:
+
+```bash
+#!/bin/bash
+
+mkdir -p ustacks_gore
+
+i=1
+
+for file in $(cat std_samples)
+do
+    ustacks -p 24 -t fastq -m 6 -i $i -M 4 -N 6 \
+            -f $file \
+            -o ustacks_gore
+    let "i+=1";
+done
+```
+
+
+
 ## 3. Construccion de catalogo
 
-Hacemos el catalogo _a mano_ y nos pasamos a `stacks`. Esta parte es laboriosa. 
+Ahora vamos a conserva el numero de alelos, SNPs y Loci dentro de un catalogo usando `cstacks`
+
+```bash
+cstacks -p 20 -o ustacks_gore -n 2 -s ustacks_gore/AN_4.fq.gz_2.5 -s ustacks_gore/AN_5.fq.gz_2.5 -s ustacks_gore/AN_6.fq.gz_2.5 -s ustacks_gore/AN_9.fq.gz_2.5
+# Final catalog contains 56131 loci.
+
+```
+
+Finalmente genotipamos las muestras de un catalogo con `sstacks`
+
+```bash
+#!/bin/bash
+
+mkdir -p ustacks_gore
+
+i=1
+
+for file in $(cat std_samples)
+do
+    sstacks -p 24 -c ustacks_gore \
+            -s $file \
+            -o ustacks_gore
+    let "i+=1";
+done
+```
+
+
+
+## 4. Population
 
 
 
@@ -167,14 +225,14 @@ Como descomprimimos el archivo de trabajo
 #SBATCH --ntasks-per-node=24 
 #SBATCH --exclusive
 
-tar -zxvf FLafarga_CICESE_Abalone_20161108−01479.tar.gz raw
+tar -xvf FLafarga_CICESE_Abalone_20161108−01479.tar.gz
 
 exit
 
 # tar -zxvf config.tar.gz etc/default/sysstat
 ```
 
-
+Metricas de calidad:
 
 ```bash
 #!/bin/bash
@@ -204,5 +262,5 @@ source activate multiqc_py2.7
 multiqc ./*_fastqc/*zip -o ./multiqc --data-format json --export
 ```
 
-
+> Notas elaboradas por Ricardo Gomez.
 
