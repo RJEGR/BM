@@ -204,7 +204,7 @@ do
 done
 ```
 
-
+Para cada muestras vamos a encontrar archivos con extension `*matches.tsv` que corresponde a los SNPs que estan alineando con el catalogo.
 
 ## 4. Population
 
@@ -262,5 +262,5 @@ source activate multiqc_py2.7
 multiqc ./*_fastqc/*zip -o ./multiqc --data-format json --export
 ```
 
-> Notas elaboradas por Ricardo Gomez.
+> Notas elaboradas por Ricardo Gomez (Sin editar).
 
