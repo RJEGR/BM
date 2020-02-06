@@ -32,7 +32,7 @@ To assess the read composition of our assembly, we want to capture and count all
 
 
 bowtie2-build Trinity.fasta Trinity.fasta
-Then perform the alignment (example for paired-end reads) to just capture the read alignment statistics.
+# Then perform the alignment (example for paired-end reads) to just capture the read alignment statistics.
 
 srun bowtie2 -p 10 -q --no-unal -k 20 -x Trinity.fasta -1 R1.P.qtrim.fq -2 R2.P.qtrim.fq | samtools view -@10 -Sb -o ./bowtie2.bam
 
@@ -85,4 +85,67 @@ samtools faidx Trinity.fasta
 
 igv.sh -g `pwd`/Trinity.fasta  `pwd`/bowtie2.coordSorted.bam
 ```
+
+## Completness
+
+> example in `/LUSTRE/bioinformatica_data/genomica_funcional/rgomez/oyster-rawdata/oyster_gon/assembly_check/completness`
+
+```bash
+#!/bin/sh
+## Directivas
+#SBATCH --job-name=BUSCOpy
+#SBATCH --output=slurm-%j.log
+#SBATCH --error=slurm-%j.err
+#SBATCH -N 1
+#SBATCH --mem=100GB
+#SBATCH --ntasks-per-node=24
+#SBATCH -t 6-00:00:00
+
+module load python-2.7-anaconda
+
+fasta=$1
+out=${fasta%.fasta}
+
+BUSCO=/home/rgomez/bin/busco-master/scripts/
+export PATH=$BUSCO:$PATH
+
+eukaryota_odb9=/LUSTRE/bioinformatica_data/genomica_funcional/rgomez/oyster-rawdata/method_v2/ANNOTATE/BUSCOdb/eukaryota_odb9
+metazoa_odb10=/LUSTRE/bioinformatica_data/genomica_funcional/rgomez/oyster-rawdata/method_v2/ANNOTATE/BUSCOdb/metazoa_odb10
+mollusca_odb10=/LUSTRE/bioinformatica_data/genomica_funcional/rgomez/oyster-rawdata/method_v2/ANNOTATE/BUSCOdb/mollusca_odb10
+bacteria_odb9=/LUSTRE/bioinformatica_data/genomica_funcional/rgomez/oyster-rawdata/method_v2/ANNOTATE/BUSCOdb/bacteria_odb9
+
+
+run_BUSCO.py -i $fasta -l $eukaryota_odb9 -m transcriptome -o ${out}_eukaryota_odb9 -c 24
+run_BUSCO.py -i $fasta -l $metazoa_odb10 -m transcriptome -o ${out}_metazoa_odb10 -c 24
+run_BUSCO.py -i $fasta -l $mollusca_odb10 -m transcriptome -o ${out}_mollusca_odb10 -c 24
+run_BUSCO.py -i $fasta -l $bacteria_odb9 -m transcriptome -o ${out}_bacteria_odb9 -c 24
+
+exit
+```
+
+Entonces generamos las figuras
+
+```bash
+mkdir summaries
+cp ./run*_odb*/short_summary_*_vs_*.txt summaries
+
+module load R-3.3.1
+
+python2.7 /home/rgomez/bin/busco-master/scripts/generate_plot.py --working_directory ./summaries/
+cp summaries/busco_figure.R .
+sed -i 's/_odb9//g' summaries/busco_figure.R
+Rscript summaries/busco_figure.R
+firefox summaries/busco_figure.png
+cp summaries/busco_figure.R .
+```
+
+
+
+Check /LUSTRE/bioinformatica_data/genomica_funcional/rgomez/oktopus_full_assembly/reads_represented/BUSCO
+
+
+
+Continue with phylogenomics
+
+https://gitlab.com/ezlab/busco_usecases/-/tree/master/phylogenomics
 
