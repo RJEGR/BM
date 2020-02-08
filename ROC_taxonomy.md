@@ -1,10 +1,17 @@
 3. **RDPtools** ([@Ricardo Gore](https://app.asana.com/0/455610172835450/list))
 
-*- Definir confiabilidad asignacion / CURVAS ROC de la clasificacion (rdp) y procesamiento en R caret (usar subset de datos p68 extraido de bold/gb)*
+- Probar rdp tools con set de muestra (Hecho)
+  - taxa-sim
+  - Leave-and-out test
+- Dar formato a archivos con datos personales (P68 + gb subset) (Viernes)
+  - taxonfile 
+  - trainset.fasta 
+  - query.fasta
+- Procesar datavis en R
+  - caret
+  - Ggplot2
 
-*- que requiere rdp de input? como procesar los output para curvas roc en r?* 
-
-# Training the classifier
+# 1. Training the classifier
 
 Follow these steps when there is a need to retrain Classifier, such as novel lineages, newly named type organisms, taxonomic rearrangements, better training set covering specific taxa, or alternative taxonomy. Two files, a taxonomy file and a training sequence file with lineage are required. Prefer high quality, full length sequences, or at least covering the entire region of gene of interest. See samplefiles for example data files.  Based on our experience, trimming the sequences to a specific region does not improve accuracy. The ranks are not required to be uniform neither, which means you can define any number of ranks as necessary. The speed of the Classifier is proportional to the number of genera, not the number of training sequences.
 
@@ -24,8 +31,6 @@ Use subcommand "taxa-sim" to calculate and plot intra taxon Similarity by fracti
 > species
 > ```
 
-`classifier taxa-sim samplefiles/new_trainset_db_taxid.txt samplefiles/new_trainset.fasta samplefiles/Armatimonadetes.fasta taxa_sim 8 rankFile.txt sab`
-
 ```bash
 #!/bin/bash
 #SBATCH --job-name=taxSim
@@ -36,8 +41,6 @@ Use subcommand "taxa-sim" to calculate and plot intra taxon Similarity by fracti
 
 rdp=/LUSTRE/bioinformatica_data/genomica_funcional/bin/rdptools/share/rdptools-2.0.2-1/
 
-export PATH=$rdp:$PATH
-
 queryFile=$1
 trainSeqFile=$2
 trainTaxonFile=$3
@@ -47,17 +50,17 @@ out=`basename ${queryFile%.fasta}`
 
 mkdir -p ${out}_taxa_sim
 
-classifier taxa-sim $trainTaxonFile $trainSeqFile $queryFile ${out}_taxa_sim 8 $rankFile sab
+java -Djava.awt.headless=true -jar $rdp/classifier.jar taxa-sim $trainTaxonFile $trainSeqFile $queryFile ${out}_taxa_sim 8 $rankFile sab
 
 exit
 
 # taxonfile trainset.fasta query.fasta outdir kmersize rankFile sab|pw
 ```
 
-How to run in the cluster
+How to run in the cluster:
 
 ```bash
-sbatch taxa_sim.sh 
+sbatch taxa_sim.sh samplefiles/Armatimonadetes.fasta samplefiles/new_trainset.fasta samplefiles/new_trainset_db_taxid.txt rankFile.txt
 ```
 
 
@@ -172,8 +175,6 @@ To run in the cluster
 sbatch rdp_loot.sh samplefiles/Armatimonadetes.fasta samplefiles/new_trainset.fasta samplefiles/new_trainset_db_taxid.txt
 ```
 
-
-
 Results available are:
 
 ```bash
@@ -187,6 +188,40 @@ Results available are:
 **misclassified sequences group by taxon
 **ROC matrix
 **Area under curve
+```
+
+Split file by repex
+
+```bash
+csplit -z Armatimonadetes_loso.txt '/^[**]/' '{*}' # in bash
+mv xx08 ROC_Armatimonadetes_loso.txt
+rm xx*
+#
+csplit -z Armatimonadetes_loto.txt '/^[**]/' '{*}' # in bash
+mv xx08 ROC_Armatimonadetes_loto.txt
+rm xx*
+```
+
+
+
+## 2. Process results in R
+
+ROC matrix
+
+```
+
+s <- read.table(file1, sep="\t", skip = 2, header = T)
+t <- read.table(file2, sep="\t", skip = 2, header = T)
+
+bootstrap	
+rank_FPR	
+rank_TPR	
+rank_F1score
+...		
+genus_FPR	
+genus_TPR	
+genus_F1score	
+
 ```
 
 

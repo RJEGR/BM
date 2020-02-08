@@ -43,6 +43,28 @@ Finally lets summary the bam file using bamtools:
 
 ```bash
 bamtools stats -in reads_represented/bowtie2.bam
+
+#or
+util=/LUSTRE/apps/bioinformatica/trinityrnaseq-Trinity-v2.8.5/util/
+
+export PATH=$util:$PATH
+
+SAM_nameSorted_to_uniq_count_stats.pl reads_represented/bowtie2.bam
+
+# or
+support_scripts=/LUSTRE/apps/bioinformatica/trinityrnaseq-Trinity-v2.8.5/util/support_scripts/
+
+export PATH=$support_scripts:$PATH
+
+srun SAM_coordSorted_fragment_Read_coverage_writer.pl bowtie2.bam &> SAM_coordSorted_fragment_Read_coverage_writer.log &
+
+# 
+srun SAM_extract_properly_mapped_pairs.pl bowtie2.bam &> SAM_extract_properly_mapped_pairs.txt &
+
+# and check SAM_ scriptss
+SAM_extract_uniquely_mapped_reads.pl
+
+srun SAM_extract_uniquely_mapped_reads.pl bowtie2.bam &> SAM_extract_uniquely_mapped_reads.txt &
 ```
 
 > in case you neet, fist install bamtools as follow: https://github.com/pezmaster31/bamtools/wiki/Building-and-installing
@@ -127,7 +149,7 @@ Entonces generamos las figuras
 
 ```bash
 mkdir summaries
-cp ./run*_odb*/short_summary_*_vs_*.txt summaries
+cp ./run_Trinity_*_odb*/short_summary* summaries
 
 module load R-3.3.1
 
