@@ -29,6 +29,15 @@ Use subcommand "taxa-sim" to calculate and plot intra taxon Similarity by fracti
 > family
 > genus
 > species
+> 
+> 
+> Root
+> Domain
+> Kingdom
+> Phylum
+> Class
+> Order
+> Family
 > ```
 
 ```bash
@@ -71,10 +80,13 @@ The program will output a tab-delimited test result file which can be loaded to 
 
 > <u>Inputs</u> 
 >
-> -q --queryFile query file contains sequences, same format as the training sequence file
-> -s --trainSeqFile training files in fasta format labelled with the lineage information
+> * -q --queryFile query file contains sequences, same format as the training sequence file
 >
-> The header of this fasta file starts with '>', followed by the sequence name, white space(s) and a list taxon names seperated by ';' with highest rank taxon first ex: Root;Bacteria;Proteobacteria;Gammaproteobacteria;Enterobacteriales;Enterobacteriaceae;Enterobacter
+> * -s --trainSeqFile training files in fasta format labelled with the lineage information
+>
+> The header of this fasta file starts with '>', followed by the sequence name, white space(s) and a list taxon names seperated by ';' with highest rank taxon first ex: **Root**;Bacteria;Proteobacteria;Gammaproteobacteria;Enterobacteriales;Enterobacteriaceae;Enterobacter
+>
+> note: specify Root name with sensitive 
 
 > ```
 > >EF515962|S000840404  Root;Bacteria;"Armatimonadetes";Chthonomonadetes;Chthonomonadales;Chthonomonadaceae;Chthonomonas/Armatimonadetes_gp3
