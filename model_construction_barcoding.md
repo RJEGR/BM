@@ -24,7 +24,7 @@ cat COI_bos_taurus.fasta peces_bold_0.2_cntrds_100_ab.fa > peces_bold_0.2_cntrds
 # 2
 mafft --maxiterate 1000 --localpair  peces_bold_0.2_cntrds_100_COI_bos_taurus.fa > peces_bold_0.2_cntrds_100_COI_bos_taurus.afa
 
-# Visualize aligment , remove misaligments and use as model to align multiple sequences with mafft or hmm
+# Visualize aligment, remove misaligments and use as model to align multiple sequences with mafft or hmm
 
 sbatch mafft.slurm peces_bold.fasta peces_bold_0.2_cntrds_100_COI_bos_taurus_clean.afa
 

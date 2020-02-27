@@ -86,7 +86,8 @@ The program will output a tab-delimited test result file which can be loaded to 
 >
 > The header of this fasta file starts with '>', followed by the sequence name, white space(s) and a list taxon names seperated by ';' with highest rank taxon first ex: **Root**;Bacteria;Proteobacteria;Gammaproteobacteria;Enterobacteriales;Enterobacteriaceae;Enterobacter
 >
-> note: specify Root name with sensitive 
+> - **note**: specify Root name with first letter as capital Letter
+> - 
 
 > ```
 > >EF515962|S000840404  Root;Bacteria;"Armatimonadetes";Chthonomonadetes;Chthonomonadales;Chthonomonadaceae;Chthonomonas/Armatimonadetes_gp3
@@ -205,12 +206,14 @@ Results available are:
 Split file by repex
 
 ```bash
-csplit -z Armatimonadetes_loso.txt '/^[**]/' '{*}' # in bash
-mv xx08 ROC_Armatimonadetes_loso.txt
+file=peces_disponibles_oksp.loso
+csplit -z ${file} '/^[**]/' '{*}' # in bash
+mv xx08 ROC_${file%.loso}_loso.txt
 rm xx*
 #
-csplit -z Armatimonadetes_loto.txt '/^[**]/' '{*}' # in bash
-mv xx08 ROC_Armatimonadetes_loto.txt
+file=peces_disponibles_oksp.loto
+csplit -z ${file} '/^[**]/' '{*}' # in bash
+mv xx08 ROC_${file%.loto}_loto.txt
 rm xx*
 ```
 
@@ -221,6 +224,8 @@ rm xx*
 ROC matrix
 
 ```
+file1='ROC_*_loso.txt'
+file2='ROC_*_loto.txt'
 
 s <- read.table(file1, sep="\t", skip = 2, header = T)
 t <- read.table(file2, sep="\t", skip = 2, header = T)
