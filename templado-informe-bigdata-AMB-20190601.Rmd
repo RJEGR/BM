@@ -52,6 +52,7 @@ multirunRD = 'multiresults.RData'
 
 
 url <- 'https://raw.githubusercontent.com/RJEGR/metagenomics/master/readtx.R'
+url <- '~/Documents/GitHub/metagenomics/readtx.R'
 source(url)
 ```
 

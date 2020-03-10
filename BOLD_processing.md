@@ -1,5 +1,3 @@
-## Summary
-
 **<u>Input file</u> **
 
 - **(peces_bold.fasta):** <u>62,544</u>
@@ -10,7 +8,7 @@
 - **(mafft_clean_vs_peces_bold.afa):** 62,559 - 15 referencias
 - **(coi_profile_vs_peces_bold_no_gaps.hmm.align):** 62529
 
-# remover el nu
+# Inicio
 
 Directories:
 
@@ -107,7 +105,7 @@ usearch  -sortbylength $udrp -output $udrp_srt
 # -consout instead of -centroids
 usearch -cluster_smallmem $udrp_srt -id  $id -consout $cntrds -usersort -sizeout
 
-# save representative centroides
+# Save representative centroides
 usearch -sortbysize $cntrds -minsize $min -output $acntrds
 
 # OTUs distribution and size
@@ -542,7 +540,7 @@ sbatch -J hmmsearch -e hmmsearch.err -o hmmsearch.out -n 24 -N 1 -t 6-00:00 -mem
 
 ```
 
-asd
+And
 
 ```bash
 #nhmmer [options] <query hmmfile|alignfile> <target seqfile>
@@ -716,7 +714,9 @@ keep_spp = args[2]
 kingdom <- strsplit(file, '[.]')[[1]][2]
 root.rank <- paste0('root;Eukaryota',';', kingdom)
 colnames <- c('Id', 'Filo', 'Clase', 'Orden', 'Familia', 'Genero', 'Especie', 'Secuencia')
+
 # read.table(vsearch.file , header=FALSE, as.is=TRUE, stringsAsFactors=FALSE)
+
 x <- read.csv(file, header=FALSE, sep='\t', na.strings=c("","NA"), stringsAsFactors=FALSE)
 names(x) <- colnames
 
@@ -781,12 +781,12 @@ Concatenamos
 ```BASH
 cat ./*/Bold.*.fasta > BOLD_public.ALL.fasta
 cat ./*/Bold.*.tax > BOLD_public.ALL.tax
+
 # or
+
 cat ./*/Bold.*.tax > BOLD_public_species.tax
 cat ./*/Bold.*.fasta > BOLD_public_species.fasta
 ```
-
-
 
 Upload to cluster:
 

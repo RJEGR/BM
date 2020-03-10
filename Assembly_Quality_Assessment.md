@@ -65,6 +65,23 @@ srun SAM_extract_properly_mapped_pairs.pl bowtie2.bam &> SAM_extract_properly_ma
 SAM_extract_uniquely_mapped_reads.pl
 
 srun SAM_extract_uniquely_mapped_reads.pl bowtie2.bam &> SAM_extract_uniquely_mapped_reads.txt &
+
+# Get ids
+# 142,725 ids
+grep 'TRINITY_' SAM_extract_uniquely_mapped_reads.txt | awk '{print $3}' | sort | uniq > SAM_extract_uniquely_mapped_reads.ids
+# 361,343 ids
+grep 'TRINITY_' SAM_extract_properly_mapped_pairs.txt | awk '{print $3}' | sort | uniq > SAM_extract_properly_mapped_pairs.ids
+
+# Get sequences 
+cat Trinity.fasta | seqkit grep -f SAM_extract_uniquely_mapped_reads.ids > Trinity_SAM_uniquely_mapped_reads.fasta
+
+cat Trinity.fasta | seqkit grep -f SAM_extract_properly_mapped_pairs.ids > Trinity_SAM_extract_properly_mapped_pairs.fasta
+
+# Get stats
+TrinityStats.pl Trinity_SAM_uniquely_mapped_reads.fasta
+TrinityStats.pl Trinity_SAM_extract_properly_mapped_pairs.fasta
+
+
 ```
 
 > in case you neet, fist install bamtools as follow: https://github.com/pezmaster31/bamtools/wiki/Building-and-installing
@@ -161,9 +178,215 @@ firefox summaries/busco_figure.png
 cp summaries/busco_figure.R .
 ```
 
+Tambien retenemos contigs en los que su status de identidad resulto `completo`, `duplicado` y `fragmentado`.
 
+```bash
+# 895197 n contigs in full- assembly oktopus
+
+egrep 'Complete|Duplicated|Fragmented' full_table_*.tsv | awk '{print $3}' | sort | uniq > SC_SD_F_TRINITY_IDS.txt
+
+# 2.
+# linearizeFasta.awk
+# https://bioinf.shenwei.me/seqkit/download/
+
+cat Trinity.fasta | seqkit grep -f run_Trinity_metazoa_odb10/SC_SD_F_TRINITY_IDS.txt > Trinity_metazoa_odb10.fasta
+
+# Metazoa
+cat Trinity.fasta | seqkit grep -f run_Trinity_metazoa_odb10/SC_SD_F_TRINITY_IDS.txt > Trinity_metazoa_odb10.fasta
+
+# Mollusca
+cat Trinity.fasta | seqkit grep -f run_Trinity_mollusca_odb10/SC_SD_F_TRINITY_IDS.txt > Trinity_mollusca_odb10.fasta
+
+# Eukaryota
+cat Trinity.fasta | seqkit grep -f run_Trinity_eukaryota_odb9/SC_SD_F_TRINITY_IDS.txt > Trinity_eukaryota_odb9.fasta
+
+TrinityStats.pl Trinity.fasta
+TrinityStats.pl Trinity_metazoa_odb10.fasta
+TrinityStats.pl Trinity_eukaryota_odb9.fasta
+TrinityStats.pl Trinity_mollusca_odb10.fasta
+```
+
+## Counting Numbers of Expressed Transcripts or Genes
+
+```bash
+#ls ./LOF_*/RSEM.isoforms.results > isoform.results
+ 
+misc=/LUSTRE/apps/bioinformatica/trinityrnaseq-Trinity-v2.8.5/util/misc
+# by gene level
+
+$misc/count_matrix_features_given_MIN_TPM_threshold.pl RSEM.trans.gene.TPM.not_cross_norm | tee genes_matrix.TPM.not_cross_norm.counts_by_min_TPM
+     
+# gene level ----
+assembly=Trinity.fasta
+# should down cause gene level ids
+$misc/contig_ExN50_statistic.pl RSEM.trans.gene.TMM.EXPR.matrix $assembly | tee genes_ExN50.stats
+
+
+# and by transcript level ----
+
+$misc/count_matrix_features_given_MIN_TPM_threshold.pl RSEM.trans.isoform.TPM.not_cross_norm | tee trans_matrix.TPM.not_cross_norm.counts_by_min_TPM
+
+assembly=Trinity.fasta
+
+$misc/contig_ExN50_statistic.pl RSEM.trans.isoform.TMM.EXPR.matrix $assembly | tee trans_ExN50.stats
+```
+
+Also run script by:
+
+```bash
+#!/bin/sh
+## Directivas
+#SBATCH --job-name=QCA
+#SBATCH -N 1
+#SBATCH --mem=100GB
+#SBATCH --ntasks-per-node=24
+#SBATCH -t 6-00:00:00
+
+# Quality Check Assembly methods by trinity: 
+
+misc=/LUSTRE/apps/bioinformatica/trinityrnaseq-Trinity-v2.8.5/util/misc
+
+TPM=$1 # RSEM.trans.gene.TMM.EXPR.matrix
+assembly=$2 # Trinity.fasta
+cross_norm=$3 # RSEM.trans.gene.TPM.not_cross_norm
+# by gene level
+
+$misc/count_matrix_features_given_MIN_TPM_threshold.pl $cross_norm | tee ${cross_norm%.not_cross_norm}_by_min_TPM
+
+$misc/contig_ExN50_statistic.pl $TPM $assembly | tee ${TPM%.matrix}_ExN50.stats
+
+exit
+
+```
+
+
+
+### Longest and Abundant isoform
+
+Dejemos de trabajar con isoformas y usemos genes, hay varias formas de trabajar:
+
+- Usar la isoforma mas abundante (`$TRINITY_HOME/util/filter_low_expr_transcripts.pl`) como la representativa
+
+```bash
+assembly=Trinity.fasta
+
+sbatch abundance.sh -t $assembly -s sampleFile
+
+#  -------
+#!/bin/sh
+## Directivas
+#SBATCH --job-name=filAb
+#SBATCH --output=slurm-%j.log
+#SBATCH --error=slurm-%j.err
+#SBATCH -N 1
+#SBATCH --mem=100GB
+#SBATCH --ntasks-per-node=24
+#SBATCH -t 6-00:00:00
+
+# ls ./*/*isoforms.results > isoforms.results
+
+assembly=$1 # Trinity.fasta
+results=$2 # isoforms.results
+# 1)
+# Get the gene-trans map file
+support_scripts=/LUSTRE/apps/bioinformatica/trinityrnaseq-Trinity-v2.8.5/util/support_scripts/
+
+$support_scripts/get_Trinity_gene_to_trans_map.pl $assembly > ${assembly%.fasta}.gene_trans_map
+
+# 2) Convert abundance results a matrix
+util=/LUSTRE/apps/bioinformatica/trinityrnaseq-Trinity-v2.8.5/util/
+
+$util/abundance_estimates_to_matrix.pl \
+        --gene_trans_map ${assembly%.fasta}.gene_trans_map \
+        --est_method RSEM \
+        --out_prefix RSEM \
+        --quant_files $results \
+        --name_sample_by_basedir
+
+# 3) Filter low exp transcripts
+# this would ideally be your TPM matrix - or TMM-normalized TPM matrix *not* raw counts)
+
+$util/filter_low_expr_transcripts.pl --matrix RSEM.isoform.TMM.EXPR.matrix --transcripts $assembly --min_expr_any 1 --gene_to_trans_map ${assembly%.fasta}.gene_trans_map > ${assembly%.fasta}.min1TPM.fasta
+
+TrinityStats.pl ${assembly%.fasta}.min1TPM.fasta > ${assembly%.fasta}.min1TPM.stats
+
+exit
+
+# continue with stasts: in 
+https://github.com/trinityrnaseq/trinityrnaseq/wiki/Trinity-Transcript-Quantification#filtering-transcripts
+```
+
+
+
+- Usar la isoforma mas larga como la representativa `$TRINITY_HOME/util/misc/get_longest_isoform_seq_per_trinity_gene.pl`
+- Elaborar un scafold de todas las isoformas (SuperTranscript)
+
+```bash
+find "$(pwd)" -name '*R2*P.qtrim.gz' | sort > R2_P.qtrim.list
+find "$(pwd)" -name '*R1*P.qtrim.gz' | sort > R1_P.qtrim.list
+
+
+find -name '*R2*P.qtrim.gz' | sort | cut -d'_' -f1 | sed 's/[./]//g' > factor1.list
+find -name '*R2*P.qtrim.gz' | sort | cut -d'_' -f1,2,3 | sed 's/[./]//g' > factor2.list
+
+paste -d'\t' factor2.list factor2.list R1_P.qtrim.list R2_P.qtrim.list > samples.file
+
+```
+
+
+
+## 
 
 Check /LUSTRE/bioinformatica_data/genomica_funcional/rgomez/oktopus_full_assembly/reads_represented/BUSCO
+
+```bash
+ls ./LOF_*/RSEM.isoforms.results > isoform.results
+ 
+util=/LUSTRE/apps/bioinformatica/trinityrnaseq-Trinity-v2.8.5/util/
+
+$util/abundance_estimates_to_matrix.pl \
+        --gene_trans_map trinity_mapped_pairs.fasta.gene_trans_map \
+        --est_method RSEM \
+        --out_prefix iso \
+        --quant_files isoform.results \
+        --name_sample_by_basedir
+        
+
+# sed -i 's/_R1//g' iso.counts.matrix
+
+TOOL=/LUSTRE/apps/bioinformatica/trinityrnaseq-Trinity-v2.5.1/Analysis/DifferentialExpression/
+
+module load R-3.5.0_bio
+# que no este cargado el source de gmelendrez o no correra
+$TOOL/run_DE_analysis.pl \
+      	  --matrix iso.counts.matrix \
+       	 --method DESeq2 \
+       	 --samples_file LOF_samples.file \
+       	 --output DESeq2_dir
+       	 
+       	 #--contrasts contrast_file.txt \
+
+# Filter DiffExp up/down
+DF=/LUSTRE/apps/bioinformatica/trinityrnaseq-Trinity-v2.5.1/Analysis/DifferentialExpression/
+
+$DF/analyze_diff_expr.pl --matrix ../iso.TMM.EXPR.matrix --samples ../LOF_samples.file -P 1e-3 -C 1 --order_columns_by_samples_file
+
+wc -l diffExpr.P*.matrix
+wc -l *UP.subset
+
+# 
+mkdir stast
+cd stast
+
+sbatch PtR.sh iso.counts.matrix LOF_samples.file
+# /LUSTRE/bioinformatica_data/genomica_funcional/rgomez/oktopus_full_assembly/DiffExp/Diana_results/stats
+
+
+#
+
+
+
+```
 
 
 

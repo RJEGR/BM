@@ -168,3 +168,24 @@ do
 	echo "$f $m"
 done
 ```
+
+
+
+Get the coordiantes
+
+```bash
+#Latitude:
+#Longitude:
+#Station:
+
+for i in Latitude Longitude Station 
+do
+	egrep $i *cnv
+done
+
+
+
+```
+
+
+

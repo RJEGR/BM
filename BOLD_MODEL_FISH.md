@@ -16,7 +16,7 @@ Los archivos de entrada se encuentran en:
 
 ```bash
 # workdir: /LUSTRE/bioinformatica_data/genomica_funcional/MG_COI/dbs/ncbi/COI_de_mitogenomas_clean
-# 1 /LUSTRE/bioinformatica_data/genomica_funcional/MG_COI/PRUEBAS/coi_refaln/
+# pruebas /LUSTRE/bioinformatica_data/genomica_funcional/MG_COI/PRUEBAS/coi_refaln/
 
 f12a0653af018d7d839d7d2b68e17acd  COI_danio_rerio.fasta
 d2548476f3313fdfc4e9c4323c0046a2  lscoi_drerio_ictioconsenso_primers_aln.fasta
@@ -60,7 +60,7 @@ vsearch  -sortbylength $seqs -output $sorted
 vsearch -derep_fulllength $sorted -output $derep -sizeout
 ```
 
-2. Alineamos todas las secuencias: `sbatch mafft.sh ncbi_fish_mitogenomes_Feb2020.good_derep.fasta COI_danio_rerio.fasta`
+2. Alineamos todas las secuencias: `sbatch mafft.slrm ncbi_fish_mitogenomes_Feb2020.good_derep.fasta COI_danio_rerio.fasta`
 
 ```bash
 #!/bin/bash
@@ -140,18 +140,19 @@ writeXStringSet(DNA, filepath = paste0(file, ".decipher.afa"), append=FALSE,
 
 
 # CHECK CODON
+```
 
-aa <- translate(dna, genetic.code = SGC1)
+3. Despues de tener listo el modelo, elaboralos el alineamiento multiple de secuencias (MSA) con el script `mafft.slrm`
 
-BrowseSeqs(aa)
+Continue ....
 
-start <- subseq(aa, 1,1)
+```bash
+sbatch mafft.slurm COI_danio_rerio_vs_ncbi_fish_mitogenomes_Feb2020.good_derep_clean.afa peces_bold.fasta
+# Output:
+# peces_bold_vs_COI_danio_rerio_vs_ncbi_fish_mitogenomes_Feb2020.good_derep_clean.afa
 
-we <- width(aa)
+# wd
 
-ws <- we -5 
-
-end <- subseq(aa, we, we)
-
+ls /LUSTRE/bioinformatica_data/genomica_funcional/MG_COI/PRUEBAS/coi_alignment_fish/mafft
 ```
 

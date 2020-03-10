@@ -36,25 +36,39 @@ echo "NCBI_API_KEY=74e0e4bf2d8eaa3bb742c46316dbafe12909" >> $HOME/.bash_profile
 ## Descarga de secuencias
 
 ```bash
-esearch -db nucleotide -query "CO1[GENE] OR COI[GENE] OR COX1[GENE] OR COXI[GENE] OR BARCODE AND "txid7898"[Organism:exp] AND COI AND "2016/01/01:2019/09"[MDAT]" | efetch -format fasta > CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta
+esearch -db nucleotide -query "CO1[GENE] OR COI[GENE] OR COX1[GENE] OR COXI[GENE] OR BARCODE AND "txid7898"[Organism:exp] AND COI AND "2016/01/01:2019/09"[MDAT]" | efetch -format fasta > BARCODE_txid7898_CO1_COI_COX1_COXI_GENE.fasta
+
 ```
+
+> Descarga de secuencias sin usar abreviatura BARCODE
+>
+> ```bash
+> esearch -db nucleotide -query "CO1[GENE] OR COI[GENE] OR COX1[GENE] OR COXI[GENE] AND "txid7898"[Organism:exp] AND COI AND "2016/01/01:2019/09"[MDAT]" | efetch -format fasta > txid7898_CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta
+> ```
+>
+> ```bash
+> esearch -db nucleotide -query "CO1[GENE] OR COI[GENE] OR COX1[GENE] OR COXI[GENE] AND "txid7898"[Organism:exp] AND "2016/01/01:2020/01/01"[MDAT]" | efetch -format fasta > txid7898_CO1_COI_COX1_COXI_GENE.fasta
+> ```
+>
 
 ## Removiendo Abreviaciones redundantes:
 
-Taxa were filtered according to the concent of the species field so that only fully identified taxa with a complete latin binomial (genus and species) were retained. Entries that contained the abbreviations. `sp.`, `nr.`, `aff.`, or `cf.` were discarded (Teresita porter et al 2018). Also include abbreviations `UNVERIFIED` and `environmental` (Miguel M 2019).
+Taxa were filtered according to the concent of the species field so that only fully identified taxa with a complete latin binomial (genus and species) were retained. Entries that contained the abbreviations. `sp.`, `nr.`, `aff.`, or `cf.` were discarded (Teresita porter et al 2018). Also include abbreviations `UNVERIFIED`, `environmental` and  `hybrid` (Miguel M 2019).
 
 1) Wrangling:
 
 ```bash
 # 1)
-grep '^>' BARCODE_txid7898_CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta | sed 's/>//g' | awk '{print $2,$3, $4}' | sort | uniq -c | sort -n > frequency.txt
+file=txid7898_CO1_COI_COX1_COXI_GENE.fasta
+# BARCODE_txid7898_CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta
+grep '^>' $file | sed 's/>//g' | awk '{print $2,$3, $4}' | sort | uniq -c | sort -n > frequency.txt
 
 # number of redundant abbreviations: 10361
 
-egrep 'sp\.|cf\.|aff\.|UNVERIFIED|environmental' frequency.txt | awk '{ sum += $1; } END { print sum; }' "$@"
+egrep 'sp\.|cf\.|aff\.|hybrid|UNVERIFIED|environmental' frequency.txt | awk '{ sum += $1; } END { print sum; }' "$@"
 
 # Linearize fasta to grep inVerte and format back to fasta
-awk -f linearizefasta.awk < BARCODE_txid7898_CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta | egrep -v 'sp\.|cf\.|aff\.|UNVERIFIED|environmental' | tr "\t" "\n" > ncbi_complete.fasta
+awk -f linearizefasta.awk < $file | egrep -v 'sp\.|cf\.|aff\.|hybrid|UNVERIFIED|environmental' | tr "\t" "\n" > ncbi_complete.fasta
 
 # Sanity check
 grep -c "^>" ncbi_complete.fasta # 89889 
@@ -65,10 +79,11 @@ grep -c "^>" ncbi_complete.fasta # 89889
 
 ```bash
 seqmagick mogrify --min-length 200 --max-length 2000 ncbi_complete.fasta
+
 grep -c "^>" ncbi_complete.fasta # 89847
 
 # Sanity check
-egrep -c 'sp\.|cf\.|aff\.|UNVERIFIED|environmental' ncbi_complete.fasta
+egrep -c 'sp\.|cf\.|aff\.|hybrid|UNVERIFIED|environmental' ncbi_complete.fasta
 ```
 
 Save headers
@@ -81,7 +96,7 @@ grep '^>' ncbi_complete.fasta | sed 's/>//g' > ncbi_complete.headers
 
 ```bash
 
-freq=frequency.txt
+freq=frequency.tmp
 awk '{ sum += $1; } END { print sum; }' "$@" $freq # 100273
 
 # 7026
@@ -108,7 +123,7 @@ grep 'nr\.' $freq # 0
 Save incomplete
 
 ```bash
-awk -f linearizefasta.awk < BARCODE_txid7898_CO1_COI_COX1_COXI_GENE_Eukaryota_nr.fasta | egrep 'sp\.|cf\.|aff\.|UNVERIFIED|environmental' | tr "\t" "\n" > ncbi_incomplete.fasta
+awk -f linearizefasta.awk < $file | egrep 'sp\.|cf\.|aff\.|UNVERIFIED|environmental' | tr "\t" "\n" > ncbi_incomplete.fasta
 
 grep -c "^>" ncbi_incomplete.fasta # 10384
 
@@ -206,6 +221,8 @@ exit
 Esta es una version para recuperar el linaje de alguna secuencia del ncbi basado en el identificador gi y usando la agrupacion de generos.
 
 ```bash
+grep '^>' ncbi_complete.fasta | sed 's/>//g' > ncbi_complete.headers
+
 awk '{print $1}' ncbi_complete.headers | sed 's/>//'  > ids
 
 # or separate by genus taxons
@@ -225,11 +242,14 @@ while IFS= read -r pattern; do grep $pattern ncbi_complete.headers | awk '{print
 
 # Sanity check 
 ls *ids | wc -l # ~ 3192 genus files
+
 wc -l *ids | sort -k2,2 | sed 's/.ids//g' > genusFiles
 
 diff genusFiles ncbi_complete_genus  # must be zero
+
 # tenemos un problema con el reconoimiento de patron 
 # time demand
+
 for i in *ids
 do 
 	genus=${i%.ids}
@@ -324,11 +344,19 @@ awk -f linearizefasta.awk < ncbi_complete.fasta | sort -k1,1 | sed 's/^>//g' > n
 
 ```R
 library(dplyr)
+library(tidyverse)
+
 x <- read.table('accTaxId', header = FALSE)
 y <- read.table('completeTaxIds.taxonomy', header = FALSE, sep=',')
 
+ranks <- c('KING', 'PHYL', 'CLSS', 'ORDR', 'FMLY', 'GNUS')
+
+y %>% 
+	separate(3, into = ranks, sep = ';') %>%
+	as_tibble() -> y
+   
 names(x) <- c('acc','taxid')
-names(y) <- c('taxid', 'SPECIE','KING', 'PHYL', 'CLSS', 'ORDR', 'FMLY', 'GNUS')
+names(y) <- c('taxid', 'SPECIE', ranks)
 
 x %>% inner_join(y) %>% as_tibble() %>% select(acc, taxid, KING, PHYL, CLSS, ORDR, FMLY, GNUS, SPECIE) -> tax
 
@@ -679,9 +707,215 @@ dim(t <- tax[tax[,1] %in% match, ]) # 38567 ??
 
 dim(tax <- separate(tax, sep = ';', col = 1, into = rank))
 
+```
+
+# Automatizacion del metodo
+
+```bash
+# BARCODE_CO1_COI_COX1_COXI_GENE_MDAT2003_2016
+# BARCODE_CO1_COI_COX1_COXI_GENE_MDAT2016_2020
+
+wd=/LUSTRE/bioinformatica_data/genomica_funcional/MG_COI/dbs/ncbi
+```
+
+Run `./prepare_acc.sh fasta.file`:
+
+`chmod +x prepare_acc.sh`
+
+```bash
+#!/bin/bash
+
+# This script will attempt a fasta file downloaded from gene bank using the e-utilities and prepare them for data cleaning and format them the accession list for subsecuent taxonomy step
+
+# 0. Check type of redundant abbreviation 
+# 1. Linearize fasta to grep inVerte (non redundant) sequences and format back to fasta 
+# 2. Check step
+# 3. Filter by min and max length
+# 4. Get the Accession Version ids
+
+# Ricardo Gomez-Reyes
+
+fasta=$1
+
+seqmagic=$(python -c 'import pkgutil; print(1 if pkgutil.find_loader("seqmagick") else 0)')
+
+if [ $seqmagic = 1 ];
+then
+a=$(which seqmagick)
+echo "Required tool already installed at $a"
+else
+echo "Installing required tool"
+pip install seqmagick
+b=$(which seqmagick)
+echo "Required tool now installed at $b"
+fi
+
+# 
+
+rm -f linearizeFasta.awk
+cat >> linearizeFasta.awk << \EOF
+/^>/ {printf("%s%s\t",(N>0?"\n":""), $0);N++;next;}
+     {printf("%s", $0);}
+END  {printf("\n");}
+EOF
+
+abb=$(egrep 'sp\.|cf\.|aff\.|hybrid|UNVERIFIED|environmental' -c $fasta)
+total=$(grep -c '^>' $fasta)
+
+# 0. Check type of redundant abbreviation ----
+
+grep '^>' $fasta | sed 's/>//g' | awk '{print $2,$3, $4}' | sort | uniq -c | sort -n > frequency.tmp
+
+egrep 'sp\.|cf\.|aff\.|hybrid|UNVERIFIED|environmental' frequency.tmp | awk '{ sum += $1; } END { print sum; }' "$@"
+
+echo "Removing $abb redundant abbreviation from $total sequences"
 
 
+# 1. Linearize fasta to grep inVerte (non redundant) sequences and format back to fasta ----
+
+awk -f linearizeFasta.awk < $fasta | egrep -v 'sp\.|cf\.|aff\.|hybrid|UNVERIFIED|environmental' | tr "\t" "\n" > ncbi_complete.fasta
+
+# 2. Check ----
+
+save=$(grep -c "^>" ncbi_complete.fasta)
+
+echo "The number of complete lineage sequences saved in ncbi_complete.fasta file are: $save"
+
+# 3. Filter by min and max length ----
+
+echo "Filtering --min-length 200 --max-length 2000"
+
+seqmagick mogrify --min-length 200 --max-length 2000 ncbi_complete.fasta
+
+save=$(grep -c "^>" ncbi_complete.fasta)
+
+echo "The number of sequences kept in ncbi_complete.fasta file are: $save"
+
+# Sanity check for clean fasta.
+
+# egrep -c 'sp\.|cf\.|aff\.|hybrid|UNVERIFIED|environmental' ncbi_complete.fasta
+
+# 4. Get the Accession Version ids ----
+grep '^>' ncbi_complete.fasta | sed 's/>//g' > ncbi_complete.headers
+
+# awk '{print $1}' ncbi_complete.headers | sed 's/>//'  > accv.ids
 
 
+# a. Count complete genus and species
+awk -f linearizeFasta.awk < ncbi_complete.fasta | grep '^>' | sed 's/>//g' | awk '{print $2,$3}' | sort | uniq -c | sort -n > frequency_sp.tmp
+
+# b.
+cat ncbi_complete.headers | awk '{gsub(/[[:punct:]]/, "" , $2); print $2}' | sort | uniq -c | sort -n > ncbi_complete_genus
+
+echo "Count of genus and species with complete lineage"
+
+wc -l frequency_sp.tmp
+wc -l ncbi_complete_genus
+
+
+# Check incomplete ----
+awk -f linearizeFasta.awk < $fasta | egrep 'sp\.|cf\.|aff\.|UNVERIFIED|environmental' | tr "\t" "\n" > ncbi_incomplete.fasta
+
+incmplt=$(grep -c "^>" ncbi_incomplete.fasta)
+
+
+echo "The number of sequences saved in ncbi_incomplete.fasta file are: $incmplt"
+
+rm *tmp linearizeFasta.awk
+
+exit
 
 ```
+
+Then run the taxonomy conversion
+
+1 - (206502/691492)
+
+```bash
+#!/bin/bash
+genus=$1 # 
+headers=$2 # ncbi_complete.headers
+
+cat ncbi_complete_genus | awk '{print $2}' > genusList
+
+# 1. Separamos ids por generos para hacer por lotes las descargas
+
+while IFS= read -r pattern; do grep $pattern ncbi_complete.headers| awk '{print $1}' > ${pattern}.ids & done < genusList
+
+# Sanity check 
+ls *ids | wc -l
+
+wc -l *ids | sort -k2,2 | sed 's/.ids//g' > genusFiles
+
+diff genusFiles ncbi_complete_genus  # must be zero
+
+# tenemos un problema con el reconoimiento de patron 
+# time demand
+
+for i in *ids
+do 
+	genus=${i%.ids}
+	epost -db nuccore -format acc -input $i | \
+	esummary | \
+	xtract -pattern DocumentSummary -element AccessionVersion TaxId > ${genus}.taxId
+done
+
+# Remove empty files
+find . -size 0 -delete
+
+# Sanity check
+
+taxid=$(ls *taxId | wc -l) # must be equal to n genus 
+
+#wc -l *taxId | sort -n | head
+
+# checkpoint
+ls *taxId | awk '{gsub(/[.]/, " " , $0); print $1}' | sort > DowloadedList
+
+diff DowloadedList genusList | awk '">" {gsub(/>/,"", $0); print}' | sort > checkpointList
+
+wc -l checkpointList # must be equal zero
+
+for genus in $(cat checkpointList)
+do 
+	epost -db nuccore -format acc -input ${genus}.ids | \
+	esummary | \
+	xtract -pattern DocumentSummary -element AccessionVersion TaxId > ${genus}.taxId
+done
+
+# redoing sanity check until checkpointList must be zero
+# Then,
+# get taxonomy
+
+cat *taxId | awk '{print $2}' | sort | uniq > completeTaxIds # 10866 number of genus
+
+for i in $(cat completeTaxIds); do efetch -db taxonomy -id $i -format xml | \
+xtract -pattern Taxon -tab "," -first TaxId ScientificName \
+-group Taxon -KING "(-)" -PHYL "(-)" -CLSS "(-)" -ORDR "(-)" -FMLY "(-)" -GNUS "(-)" \
+-block "*/Taxon" -match "Rank:kingdom" -KING ScientificName \
+-block "*/Taxon" -match "Rank:phylum" -PHYL ScientificName \
+-block "*/Taxon" -match "Rank:class" -CLSS ScientificName \
+-block "*/Taxon" -match "Rank:order" -ORDR ScientificName \
+-block "*/Taxon" -match "Rank:family" -FMLY ScientificName \
+-block "*/Taxon" -match "Rank:genus" -GNUS ScientificName \
+-group Taxon -tab ";" -element "&KING" "&PHYL" "&CLSS" "&ORDR" "&FMLY" "&GNUS"; done > completeTaxIds.taxonomy
+
+# Sanity check
+wc -l completeTaxIds.taxonomy # 10866 number of linage recovery
+cut -d',' -f1 completeTaxIds.taxonomy | sort > DowmloadedLinage
+diff DowmloadedLinage completeTaxIds | sort # must be zero
+
+# Check Actinopteri class
+grep 'Actinopteri' -c completeTaxIds.taxonomy # 10862
+
+cut -d',' -f5 completeTaxIds.taxonomy | sort | uniq -c | sort -n
+#   1 Chordata
+#   4 Cladistia
+#10861 Actinopteri
+
+# clean temporally files
+rm *.ids
+
+cat *.taxId | sort | uniq > accTaxId
+```
+

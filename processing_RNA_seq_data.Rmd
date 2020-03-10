@@ -169,6 +169,7 @@ cg_nuc_annot <- data.frame(id = cg_nuc_annot$V1, annot = apply(cg_nuc_annot[-c(1
 ```
 
 ```{r parse data}
+library(dplyr)
 pfam <- as.data.frame(split_pfam(x1))
 
 go <- split_GO(x1)
@@ -591,7 +592,7 @@ p1 <- ggplot(datam, aes(x=variable, y=rawCount)) +
 rpm <- apply(data, 2, function(x) {x / sum(x)})
 # sanity check
 barplot(colSums(rpm))
-```    
+```
 
 ```{r -log2 transformation, echo = FALSE}
 #data <- y[-1] # restore before doing various data transformations
@@ -712,4 +713,60 @@ superheat(annot_tbl_boo)
 
 ```
 
+
+
+```bash
+# es necesario instalar hmmsearch2 version antigua para usar el flag compact!
+tar zxvf hmmer-2.3.tar.gz
+
+cd hmmer-2.3
+
+./configure --mandir=`pwd` --bindir=`pwd`/bin --prefix=`pwd`
+
+make
+make check
+make install
+
+# or download compiled version
+
+wget http://eddylab.org/software/hmmer/2.3/hmmer-2.3.bin.intel-linux.tar.gz .
+
+# then edit
+grep '$HMMSEARCH_BINARY' rnammer
+
+export PATH=/LUSTRE/bioinformatica_data/genomica_funcional/bin/RNAMMER2_TRINOTATE/hmmer-2.3.bin.intel-linux/binaries/:$PATH
+
+
+rnammer=/LUSTRE/bioinformatica_data/genomica_funcional/bin/rnammer/
+$rnammer/rnammer -S euk -m tsu,lsu,ssu -gff tmp.superscaff.rnammer.gff < transcriptSuperScaffold.fasta
+
+which: no hmmsearch2 in ($PATH)
+
+Error, cannot find path to hmmsearch at /LUSTRE/bioinformatica_data/genomica_funcional/bin/rnammer/rnammer line 53.
+
+Error, cmd: perl 
+
+$rnammer/rnammer -S euk -m tsu,lsu,ssu -gff tmp.superscaff.rnammer.gff < transcriptSuperScaffold.fasta died with ret 65280 at 
+
+
+# =====
+HMMSEARCH_BINARY=/LUSTRE/bioinformatica_data/genomica_funcional/bin/RNAMMER2_TRINOTATE/hmmer-2.3.bin.intel-linux/binaries/
+export PATH=$HMMSEARCH_BINARY:$PATH
+
+
+SOURCE=/LUSTRE/bioinformatica_data/genomica_funcional/scripts/exports
+
+source $SOURCE
+
+export PATH=$BLAST:$PATH                                                        #
+export PATH=$UTILS:$PATH                                                        #
+export PATH=$DECODER:$PATH                                                      #
+export PATH=$TRINOTATE:$PATH                                                    #
+export PATH=$NOTATE_AD:$PATH                                                    #
+export PATH=$PERL:$PATH                                                         #
+export PATH=$AUTO:$PATH                                                         #
+export PATH=$HMMER:$PATH
+export PATH=$HMMSEARCH_BINARY:$PATH
+
+```
 
