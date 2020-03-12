@@ -798,7 +798,7 @@ echo "The number of sequences kept in ncbi_complete.fasta file are: $save"
 # 4. Get the Accession Version ids ----
 grep '^>' ncbi_complete.fasta | sed 's/>//g' > ncbi_complete.headers
 
-# awk '{print $1}' ncbi_complete.headers | sed 's/>//'  > accv.ids
+awk '{print $1}' ncbi_complete.headers | sed 's/>//'  > accv.ids
 
 
 # a. Count complete genus and species
@@ -833,17 +833,22 @@ Then run the taxonomy conversion
 
 ```bash
 #!/bin/bash
-genus=$1 # 
-headers=$2 # ncbi_complete.headers
+acc=$1 # accv.ids
 
-cat ncbi_complete_genus | awk '{print $2}' > genusList
+# 1. Separamos ids por generos para hacer por lotes las descargas (no es posible con tantos datos #
 
-# 1. Separamos ids por generos para hacer por lotes las descargas
+# while IFS= read -r acc; epost -db nuccore -format acc | esummary | xtract -pattern DocumentSummary -element AccessionVersion TaxId >> acc2TaxId.list & done < accv.ids
 
-while IFS= read -r pattern; do grep $pattern ncbi_complete.headers| awk '{print $1}' > ${pattern}.ids & done < genusList
+for acc in $(cat accv.ids)
+do
+	echo $acc | epost -db nuccore -format acc | \
+	esummary | \
+	xtract -pattern DocumentSummary -element AccessionVersion TaxId >> acc2TaxId.list
+done
 
 # Sanity check 
-ls *ids | wc -l
+ls accv.ids | wc -l
+ls acc2TaxId.list | wc -l 
 
 wc -l *ids | sort -k2,2 | sed 's/.ids//g' > genusFiles
 
