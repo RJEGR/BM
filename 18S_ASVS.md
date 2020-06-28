@@ -14,7 +14,7 @@ Configure it and save in a script of name `clip.slurm`
 ```bash
 #!/bin/bash
 #SBATCH --job-name=cutadapt
-#SBATCH -N 3
+#SBATCH -N 1
 #SBATCH --mem=100GB
 #SBATCH --ntasks-per-node=24
 
@@ -23,7 +23,7 @@ do
 withpath="${file}"
 filename=${withpath##*/}
 base="${filename%*_R*.fastq.gz}"
-./cutadapt -a ^TTGTACACACCGCCC...GTAGGTGAACCTGCRGAAGG -A ^CCTTCYGCAGGTTCACCTAC...GGGCGGTGTGTACAA --discard-untrimmed -o ${base}_R1.clipped.fastq.gz -p ${base}_R2.clipped.fastq.gz ${base}_R1_001.fastq.gz ${base}_R2_001.fastq.gz
+./cutadapt -a ^TTGTACACACCGCCC...GTAGGTGAACCTGCRGAAGG -A ^CCTTCYGCAGGTTCACCTAC...GGGCGGTGTGTACAA --discard-untrimmed -o ${base}_R1.clipped.fastq.gz -p ${base}_R2.clipped.fastq.gz ${base}_R1_001.fastq.gz ${base}_R2_001.fastq.gz --cores 24
 done
 
 mkdir -p clipped
@@ -33,4 +33,33 @@ exit 0
 
 ```
 
-#
+slurm the script `dada.slurm dada workdir 100 80 `
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=dada_18S
+#SBATCH -N 2
+#SBATCH --mem=100GB
+#SBATCH --ntasks-per-node=24
+#SBATCH -t 6-00:00:00
+
+echo "Fecha inicio: `date`"
+echo "Ejecutandose con $SLURM_JOB_CPUS_PER_NODE"
+echo "Numero de nodos: $SLURM_NNODES y CPU por nodo: $SLURM_CPUS_ON_NODE"
+echo "CPUs totales= $SLURM_NPROCS"
+echo "Los nodos utilizados son: $SLURM_NODELIST"
+
+
+TESTNAME=$1
+WORKDIR=$2
+trunF=$3
+trunR=$4
+
+module load R-3.5.0
+Rscript --vanilla multirun_18S.R $TESTNAME $LIBRARIES_DIR $trunF $trunR $SLURM_NPROCS 
+
+exit 0
+
+
+```
+
