@@ -94,7 +94,7 @@ The program will output a tab-delimited test result file which can be loaded to 
 > acgaacgcttgcggcgtgcctaagaaatgcaagtcgagcggggagcaat ...
 > ```
 >
-> -t --trainTaxonFile contains the hierarchical taxonomy information, taxon name and rank together is unique. The format looks like the following: taxid*taxon name*parent taxid*depth*rank Note taxid, the parent taxid and depth should be in integer format. depth indicates the depth from the root taxon. Recommend removing duplicate seqeunces using command `rmdupseq`.
+> -t --trainTaxonFile contains the hierarchical taxonomy information, taxon name and rank together is unique. The format looks like the following: taxid*taxon name*parent taxid*depth*rank Note taxid, the parent taxid and depth should be in integer format. depth indicates the depth from the root taxon. Recommend removing duplicate seqeunces using command `seqkit rmdup`.
 >
 > ```
 > 0*Root*-1*0*rootrank
@@ -268,8 +268,8 @@ genus_F1score
 
   * Columns should be:
   	1. SeqID.  Same as in fasta file
-  	2-N Rank Names. in order from higher (kingdom) to lower (genus)
-  	
+    	2-N Rank Names. in order from higher (kingdom) to lower (genus)
+
   	```bash
   	0. AB477020.1
   	1. root
@@ -279,8 +279,8 @@ genus_F1score
   	5. Pleuronectiformes
   	6. Cynoglossidae     
   	7. Paraplagusia
-  	```
-  	
+    	```
+
   * Empty taxon names shuold be '-'
 
   * >  **Convergent taxons are not allowed** (same taxon name for two different parents, e.g. Clostridiaceae>Clostridium and Eubacteria>Clostridium
