@@ -64,6 +64,23 @@ base="${filename%*_R*.fastq.gz}"
 #zcat ${base}_R1.clipped.fastq.gz | grep -c "^@M" ; 
 echo $base | awk 'BEGIN { FS = "-" } ; { print $3"."$2 }'
 done
+
+# 
+
+for file in $(ls *R1*gz | grep -e 'fastq' -e 'fq' -e 'gz')
+do
+withpath="${file}"
+filename=${withpath##*/}
+base="${filename%*_R*.fastq.gz}"
+zcat ${base}_R1_001.qtrim.gz | grep -c "^@M" ;
+#zcat ${base}_R1.clipped.fastq.gz | grep -c "^@M" ; 
+echo $base | awk 'BEGIN { FS = "-" } ; { print $3"."$2 }'
+done
+
+
+#
+
+for file in $(ls *R1*gz | grep -e 'fastq' -e 'fq' -e 'gz'); do withpath="${file}"; filename=${withpath##*/}; base="${filename%*_R*.qtrim.gz}"; echo $base; done
 ```
 
 
