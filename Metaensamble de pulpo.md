@@ -71,5 +71,7 @@ El problema con transrate
 
 ```
 Se modificó la configuración de snap (snap.rb); agregando un numero mayor en el parametro mcp (cmd << " -mcp 10000000"); El archivo modificado se encuentra en: /LUSTRE/bioinformatica_data/RNA/ricardo/bioinformatics/transrate-1.0.3-linux-x86_64/lib/app/lib/transrate/snap.rb sin éxito en la ejecución de transrate con ensamble de lecturas abundantes.
+
+
 ```
 

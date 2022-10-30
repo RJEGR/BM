@@ -149,7 +149,9 @@ export PATH=/LUSTRE/apps/bioinformatica/trinityrnaseq-Trinity-v2.8.5/trinity-plu
 
 which Trinity
 
-Trinity --seqType fq \
+Trinity --seqType fq --max_memory 100G --samples_file samples.file --no_normalize_reads --CPU 24 --output trinity_out --no_salmon
+
+# Trinity --seqType fq \
          --left R1.fastq  \
          --right R2.fastq\
          --max_memory 100G \
